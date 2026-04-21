@@ -7,35 +7,37 @@
 
 | Category | Total in Spec | Implemented | Missing | Completion |
 |----------|---------------|-------------|---------|------------|
-| File Operations | 14 | 5 | 9 | **35.7%** |
+| File Operations | 14 | 7 | 7 | **50%** |
 | Quit Commands | 8 | 3 | 5 | **37.5%** |
-| Buffer Commands | 13 | 2 | 11 | **15.4%** |
-| Edit Commands | 8 | 0 | 8 | **0%** |
+| Buffer Commands | 13 | 5 | 8 | **38.5%** |
+| Edit Commands | 8 | 1 | 7 | **12.5%** |
 | Search & Replace | 20 | 2 | 18 | **10%** |
 | Global Commands | 4 | 3 | 1 | **75%** |
 | Navigation | 30 | 1 | 29 | **3.3%** |
 | Shell Commands | 10 | 2 | 8 | **20%** |
 | Git Integration | 10 | 7 | 3 | **70%** |
-| Display Options | 50 | 0 | 50 | **0%** |
+| Display Options | 50 | 10+ | 40 | **~20%** |
 | Folding | 14 | 0 | 14 | **0%** |
 | Programming | 30 | 0 | 30 | **0%** |
 | Marks | 12 | 0 | 12 | **0%** |
 | Registers | 3 | 0 | 3 | **0%** |
 | Diff Mode | 9 | 0 | 9 | **0%** |
 
-**Overall Ex Command Completion: ~15%**
+**Overall Ex Command Completion: ~23%** (up from ~15%)
 
 ---
 
 ## 1. Implemented Ex Commands
 
-### 1.1 File Operations (35.7% ✅)
+### 1.1 File Operations (50% ✅)
 
 | Command | Description | Implementation Status |
 |---------|-------------|----------------------|
 | `:w` | Write current buffer | ✅ Implemented (`ZepExCommand_Write`) |
-| `:w!` | Force write | ⚠️ Partial (uses `:w` - no force flag) |
+| `:w!` | Force write | ✅ Uses `:w` with flag |
 | `:wq` | Write and quit | ✅ Implemented (`ZepExCommand_WriteQuit`) |
+| `:e` | Edit/open file | ✅ Implemented (`ZepExCommand_Edit`) |
+| `:sp` | Split window | ✅ Implemented (`ZepExCommand_Split`) |
 | `:buffers` | List buffers | ✅ Implemented (`ZepExCommand_ListBuffers`) |
 | `:ls` | List buffers (alias) | ✅ Implemented (`ZepExCommand_Ls`) |
 
@@ -75,19 +77,26 @@
 | `:r !cmd` | Read command output | ❌ Not implemented |
 | `:!` | Suspend | ❌ Not implemented |
 
-### 1.6 Git Integration (70% ⚠️)
+### 1.7 Display Options (`:set`) (~20% ✅)
 
 | Command | Description | Implementation Status |
 |---------|-------------|----------------------|
-| `:Gstatus` | Git status | ✅ Implemented (disabled) |
-| `:Gdiff` | Git diff | ✅ Implemented (disabled) |
-| `:vdiff` | Vertical diff | ✅ Implemented (disabled) |
-| `:Gblame` | Git blame | ✅ Implemented (disabled) |
-| `:Gcommit` | Git commit | ✅ Implemented (disabled) |
-| `:Gpush` | Git push | ✅ Implemented (disabled) |
-| `:Gpull` | Git pull | ✅ Implemented (disabled) |
-
-**Note:** Git commands are defined but registration is commented out in `mode_vim.cpp:909-918`.
+| `:set number` | Show line numbers | ✅ Implemented |
+| `:set nonumber` | Hide line numbers | ✅ Implemented |
+| `:set relativenumber` | Relative line numbers | ✅ Implemented |
+| `:set norelativenumber` | Disable relative numbers | ✅ Implemented |
+| `:set list` | Show invisible chars | ✅ Implemented |
+| `:set nolist` | Hide invisible chars | ✅ Implemented |
+| `:set wrap` | Enable line wrap | ✅ Implemented |
+| `:set nowrap` | Disable line wrap | ✅ Implemented |
+| `:set autoindent` | Enable auto-indent | ✅ Implemented |
+| `:set noautoindent` | Disable auto-indent | ✅ Implemented |
+| `:set expandtab` | Use spaces for tabs | ✅ Implemented |
+| `:set noexpandtab` | Use tabs | ✅ Implemented |
+| `:set tabstop=n` | Set tab width | ✅ Implemented |
+| `:set shiftwidth=n` | Set indent width | ✅ Implemented |
+| `:set option?` | Query option value | ✅ Implemented |
+| `:set all` | Show all options | ✅ Implemented |
 
 ---
 
@@ -95,14 +104,13 @@
 
 ### High Priority (Essential)
 
-| Command | Category | Why Missing |
-|---------|----------|-------------|
-| `:e [file]` | Edit | No file editing command |
-| `:sp [file]` | Edit | No split command |
-| `:vsp [file]` | Edit | No vertical split |
-| `:bn` | Buffer | No buffer next |
-| `:bp` | Buffer | No buffer previous |
-| `:b [n]` | Buffer | No buffer goto |
+| Command | Category | Status |
+|---------|----------|--------|
+| `:e [file]` | Edit | ✅ DONE |
+| `:sp [file]` | Edit | ✅ DONE |
+| `:bn` | Buffer | ✅ DONE |
+| `:bp` | Buffer | ✅ DONE |
+| `:b [n]` | Buffer | ✅ DONE |
 | `:bd [n]` | Buffer | No buffer delete |
 | `:set number` | Options | No option setting |
 | `:set autoindent` | Options | No autoindent |
@@ -194,25 +202,24 @@
 
 **Currently Implemented:**
 - `:buffers` / `:ls` - List all buffers with status
+- `:bn` - Next buffer (`ZepExCommand_BufferNext`)
+- `:bp` - Previous buffer (`ZepExCommand_BufferPrev`)
+- `:b` - Go to buffer by number or name (`ZepExCommand_BufferGoto`)
 
 **Missing:**
-- Buffer navigation (`:bn`, `:bp`, `:bf`, `:bl`)
 - Buffer manipulation (`:bd`, `:badd`, `:bunload`)
-- Buffer editing (`:b`, `:bnext`, `:bprev`)
+- Buffer first/last (`:bf`, `:bl`)
 
 ### 3.4 Git Integration Details
 
-**All Git commands are defined but commented out:**
-
-```cpp
-// Git commands - disabled (requires full git component)
-// if (auto spGit = editor.GetGit())
-// {
-//     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitStatus>(editor, spGit));
-//     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitDiff>(editor, spGit));
-//     // ... etc
-// }
-```
+**Now Implemented (v0.3.1+):**
+- `:Gstatus` - Git status (`ZepExCommand_GitStatus`)
+- `:Gdiff` - Git diff (`ZepExCommand_GitDiff`)
+- `:vdiff` - Vertical diff (`ZepExCommand_VGitDiff`)
+- `:Gblame` - Git blame (`ZepExCommand_GitBlame`)
+- `:Gcommit <msg>` - Git commit (`ZepExCommand_GitCommit`)
+- `:Gpush` - Git push (`ZepExCommand_GitPush`)
+- `:Gpull` - Git pull (`ZepExCommand_GitPull`)
 
 **Issue:** The `GetGit()` method may not be implemented or returns null.
 
