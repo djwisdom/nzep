@@ -341,6 +341,7 @@ inline NotificationBuilder BuildFailed(const std::string& project,
     const std::string& log_link)
 {
     return NotificationBuilder(NotificationType::BuildFailure)
+        .SetSummary("Build failed: " + error)
         .SetProject(project)
         .SetTarget(target)
         .SetError(error)
@@ -400,12 +401,12 @@ inline NotificationBuilder SecurityAlert(const std::string& repo_file,
     const std::string& report_link)
 {
     return NotificationBuilder(NotificationType::SecurityAlert)
+        .SetSummary("Security: " + remediation)
         .SetProject(repo_file)
         .SetSeverity(severity)
         .SetError("remediation: " + remediation)
         .SetLink(report_link)
-        .SetAction("View Report")
-        .AsCritical();
+        .SetAction("View Report");
 }
 
 // ============================================================================
