@@ -2,6 +2,7 @@
 #include <memory>
 #include <sstream>
 
+#include "zep/buffer.h"
 #include "zep/commands_terminal.h"
 #include "zep/editor.h"
 #include "zep/git.h"
@@ -10,6 +11,7 @@
 #include "zep/mode_vim.h"
 #include "zep/tab_window.h"
 #include "zep/theme.h"
+#include "zep/window.h"
 
 #include "zep/mcommon/animation/timer.h"
 #include "zep/mcommon/logger.h"
@@ -1088,6 +1090,278 @@ public:
     }
 };
 
+class ZepExCommand_Set : public ZepExCommand
+{
+public:
+    ZepExCommand_Set(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "set";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        if (args.size() < 2)
+        {
+            ShowAllOptions();
+            return;
+        }
+
+        std::string opt = args[1];
+
+        // Query option (ending with ?)
+        if (!opt.empty() && opt.back() == '?')
+        {
+            opt.pop_back();
+            QueryOption(opt);
+            return;
+        }
+
+        // Set option
+        SetOption(opt);
+    }
+
+private:
+    void ShowAllOptions()
+    {
+        std::ostringstream str;
+        str << "    number: " << (GetEditor().GetConfig().showLineNumbers ? "on" : "off") << "\n";
+        str << "  relativenumber: " << (IsRelativeNumberEnabled() ? "on" : "off") << "\n";
+        str << "        list: " << (IsFlagEnabled(WindowFlags::ShowWhiteSpace) ? "on" : "off") << "\n";
+        str << "        wrap: " << (IsFlagEnabled(WindowFlags::WrapText) ? "on" : "off") << "\n";
+        str << "  autoindent: " << (ZTestFlags(GetEditor().GetFlags(), ZepEditorFlags::AutoIndent) ? "on" : "off") << "\n";
+        str << "   expandtab: " << (IsInsertTabsEnabled() ? "off" : "on") << "\n"; // insert spaces (no expandtab) -> InsertTabs = false -> expandtab
+        str << "    tabstop: " << GetEditor().GetConfig().tabStop << "\n";
+        str << "  shiftwidth: " << GetEditor().GetConfig().shiftWidth;
+
+        GetEditor().SetCommandText(str.str());
+    }
+
+    void QueryOption(const std::string& opt)
+    {
+        std::ostringstream str;
+
+        if (opt == "number")
+        {
+            str << (GetEditor().GetConfig().showLineNumbers ? "number" : "nonumber");
+        }
+        else if (opt == "relativenumber")
+        {
+            str << (IsRelativeNumberEnabled() ? "relativenumber" : "norelativenumber");
+        }
+        else if (opt == "list")
+        {
+            str << (IsFlagEnabled(WindowFlags::ShowWhiteSpace) ? "list" : "nolist");
+        }
+        else if (opt == "wrap")
+        {
+            str << (IsFlagEnabled(WindowFlags::WrapText) ? "wrap" : "nowrap");
+        }
+        else if (opt == "autoindent")
+        {
+            str << (ZTestFlags(GetEditor().GetFlags(), ZepEditorFlags::AutoIndent) ? "autoindent" : "noautoindent");
+        }
+        else if (opt == "expandtab")
+        {
+            str << (IsInsertTabsEnabled() ? "noexpandtab" : "expandtab");
+        }
+        else if (opt == "tabstop")
+        {
+            str << "tabstop=" << GetEditor().GetConfig().tabStop;
+        }
+        else if (opt == "shiftwidth")
+        {
+            str << "shiftwidth=" << GetEditor().GetConfig().shiftWidth;
+        }
+        else
+        {
+            str << "No such option: " << opt;
+        }
+
+        GetEditor().SetCommandText(str.str());
+    }
+
+    void SetOption(const std::string& opt)
+    {
+        if (opt == "number")
+        {
+            SetShowLineNumbers(true);
+        }
+        else if (opt == "nonumber")
+        {
+            SetShowLineNumbers(false);
+        }
+        else if (opt == "relativenumber")
+        {
+            SetRelativeNumber(true);
+        }
+        else if (opt == "norelativenumber")
+        {
+            SetRelativeNumber(false);
+        }
+        else if (opt == "list")
+        {
+            SetFlag(WindowFlags::ShowWhiteSpace, true);
+        }
+        else if (opt == "nolist")
+        {
+            SetFlag(WindowFlags::ShowWhiteSpace, false);
+        }
+        else if (opt == "wrap")
+        {
+            SetFlag(WindowFlags::WrapText, true);
+        }
+        else if (opt == "nowrap")
+        {
+            SetFlag(WindowFlags::WrapText, false);
+        }
+        else if (opt == "autoindent")
+        {
+            GetEditor().SetFlags(GetEditor().GetFlags() | ZepEditorFlags::AutoIndent);
+        }
+        else if (opt == "noautoindent")
+        {
+            GetEditor().SetFlags(GetEditor().GetFlags() & ~ZepEditorFlags::AutoIndent);
+        }
+        else if (opt == "expandtab")
+        {
+            SetInsertTabs(false); // expandtab = use spaces -> InsertTabs = false
+        }
+        else if (opt == "noexpandtab")
+        {
+            SetInsertTabs(true); // noexpandtab = use tabs -> InsertTabs = true
+        }
+        else if (opt.find('=') != std::string::npos)
+        {
+            size_t pos = opt.find('=');
+            std::string name = opt.substr(0, pos);
+            std::string value = opt.substr(pos + 1);
+
+            if (name == "tabstop")
+            {
+                SetTabStop(value);
+            }
+            else if (name == "shiftwidth")
+            {
+                SetShiftWidth(value);
+            }
+            else
+            {
+                GetEditor().SetCommandText("Not implemented: " + name);
+            }
+        }
+        else if (opt == "all")
+        {
+            ShowAllOptions();
+        }
+        else
+        {
+            GetEditor().SetCommandText("Not implemented: " + opt);
+        }
+    }
+
+    bool IsRelativeNumberEnabled() const
+    {
+        auto pMode = GetEditor().GetGlobalMode();
+        return pMode && strcmp(pMode->Name(), "Vim") == 0
+            ? static_cast<ZepMode_Vim*>(pMode)->UsesRelativeLines()
+            : false;
+    }
+
+    bool IsFlagEnabled(uint32_t flag) const
+    {
+        auto pWindow = GetEditor().GetActiveWindow();
+        return pWindow ? ZTestFlags(pWindow->GetWindowFlags(), flag) : false;
+    }
+
+    bool IsInsertTabsEnabled() const
+    {
+        auto pBuffer = GetEditor().GetActiveBuffer();
+        return pBuffer ? pBuffer->HasFileFlags(FileFlags::InsertTabs) : false;
+    }
+
+    void SetShowLineNumbers(bool enable)
+    {
+        GetEditor().GetConfig().showLineNumbers = enable;
+        auto pWindow = GetEditor().GetActiveWindow();
+        if (pWindow)
+        {
+            uint32_t flags = pWindow->GetWindowFlags();
+            if (enable)
+                flags |= WindowFlags::ShowLineNumbers;
+            else
+                flags &= ~WindowFlags::ShowLineNumbers;
+            pWindow->SetWindowFlags(flags);
+        }
+    }
+
+    void SetRelativeNumber(bool enable)
+    {
+        auto pMode = GetEditor().GetGlobalMode();
+        if (pMode && strcmp(pMode->Name(), "Vim") == 0)
+        {
+            static_cast<ZepMode_Vim*>(pMode)->SetUseRelativeLineNumbers(enable);
+        }
+    }
+
+    void SetFlag(uint32_t flag, bool enable)
+    {
+        auto pWindow = GetEditor().GetActiveWindow();
+        if (pWindow)
+        {
+            uint32_t flags = pWindow->GetWindowFlags();
+            if (enable)
+                flags |= flag;
+            else
+                flags &= ~flag;
+            pWindow->SetWindowFlags(flags);
+        }
+    }
+
+    void SetInsertTabs(bool enable)
+    {
+        auto pBuffer = GetEditor().GetActiveBuffer();
+        if (pBuffer)
+        {
+            pBuffer->SetFileFlags(FileFlags::InsertTabs, enable);
+        }
+    }
+
+    void SetTabStop(const std::string& value)
+    {
+        try
+        {
+            int val = std::stoi(value);
+            if (val > 0)
+            {
+                GetEditor().GetConfig().tabStop = val;
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+
+    void SetShiftWidth(const std::string& value)
+    {
+        try
+        {
+            int val = std::stoi(value);
+            if (val > 0)
+            {
+                GetEditor().GetConfig().shiftWidth = val;
+            }
+        }
+        catch (...)
+        {
+        }
+    }
+};
+
 void RegisterVimExCommands(ZepEditor& editor)
 {
     editor.RegisterExCommand(std::make_shared<ZepExCommand_Substitute>(editor));
@@ -1103,6 +1377,7 @@ void RegisterVimExCommands(ZepEditor& editor)
     editor.RegisterExCommand(std::make_shared<ZepExCommand_BufferPrev>(editor));
     editor.RegisterExCommand(std::make_shared<ZepExCommand_BufferGoto>(editor));
     editor.RegisterExCommand(std::make_shared<ZepExCommand_Split>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Set>(editor));
 
     if (auto spGit = editor.GetGit())
     {

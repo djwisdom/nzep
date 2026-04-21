@@ -55,8 +55,15 @@ public:
     virtual void AddSearchKeyMaps();
     virtual bool UsesRelativeLines() const override
     {
-        return true;
+        return m_useRelativeLineNumbers;
     }
+    void SetUseRelativeLineNumbers(bool use)
+    {
+        m_useRelativeLineNumbers = use;
+    }
+
+private:
+    bool m_useRelativeLineNumbers = true;
 
 private:
     bool IsValidRegister(char reg) const;

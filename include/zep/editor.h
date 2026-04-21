@@ -261,6 +261,8 @@ struct EditorConfig
     float backgroundFadeWait = 60.0f;
     bool showMinimap = false;
     float minimapWidth = 100.0f;
+    int tabStop = 4;
+    int shiftWidth = 4;
 };
 
 class ZepExCommand : public ZepComponent
