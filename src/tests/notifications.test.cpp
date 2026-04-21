@@ -1,7 +1,7 @@
 #include "config_app.h"
 #include "zep/mcommon/logger.h"
 
-#include "notifications.h"
+#include "../../notifications.h"
 #include <gtest/gtest.h>
 
 using namespace ZepNotifications;
