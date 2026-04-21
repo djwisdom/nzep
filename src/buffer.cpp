@@ -1556,6 +1556,19 @@ tRangeMarkers ZepBuffer::GetRangeMarkersOnLine(uint32_t markerTypes, long line) 
     return rangeMarkers;
 }
 
+std::vector<std::shared_ptr<RangeMarker>> ZepBuffer::GetErrors() const
+{
+    std::vector<std::shared_ptr<RangeMarker>> errors;
+    ForEachMarker(RangeMarkerType::Error,
+        Zep::Direction::Forward,
+        GlyphIterator(this, 0), GlyphIterator(this, End().Index()),
+        [&](const std::shared_ptr<RangeMarker>& marker) {
+            errors.push_back(marker);
+            return true;
+        });
+    return errors;
+}
+
 bool ZepBuffer::IsHidden() const
 {
     auto windows = GetEditor().FindBufferWindows(this);

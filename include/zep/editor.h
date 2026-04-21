@@ -48,15 +48,16 @@ class ZepBuffer;
 class ZepMode;
 class ZepMode_Vim;
 class ZepMode_Standard;
-class ZepEditor;
 class ZepSyntax;
-class ZepTabWindow;
-class ZepWindow;
 class ZepTheme;
+class RangeMarker;
 class ZepDisplay;
 class IZepFileSystem;
 class Indexer;
 class ZepGit;
+class ZepWindow;
+class ZepTabWindow;
+class ZepEditor;
 
 struct Region;
 
@@ -115,7 +116,8 @@ enum class Msg
     ComponentChanged,
     Tick,
     ConfigChanged,
-    ToolTip
+    ToolTip,
+    GoToMarker
 };
 
 struct IZepComponent;
@@ -148,12 +150,20 @@ public:
     {
     }
 
+    ZepMessage(Msg id, const NVec2f& p, std::shared_ptr<RangeMarker> spMarker)
+        : messageId(id)
+        , pos(p)
+        , spMarker(spMarker)
+    {
+    }
+
     Msg messageId; // Message ID
     std::string str; // Generic string for simple messages
     bool handled = false; // If the message was handled
     NVec2f pos;
     ZepMouseButton button = ZepMouseButton::Unknown;
     IZepComponent* pComponent = nullptr;
+    std::shared_ptr<RangeMarker> spMarker;
 };
 
 struct IZepComponent

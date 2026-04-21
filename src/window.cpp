@@ -322,6 +322,25 @@ void ZepWindow::Notify(std::shared_ptr<ZepMessage> payload)
         DisableToolTipTillMove();
         */
     }
+    else if (payload->messageId == Msg::GoToMarker)
+    {
+        if (payload->spMarker)
+        {
+            auto markerRange = payload->spMarker->GetRange();
+            GlyphIterator targetLoc(m_pBuffer, markerRange.first);
+
+            // Center the cursor in the viewport
+            long targetLine = m_pBuffer->GetBufferLine(targetLoc);
+            m_textOffsetPx = (float)targetLine * m_defaultLineSize;
+            m_textOffsetPx -= m_textRegion->rect.Height() / 2.0f;
+            m_textOffsetPx = std::max(0.0f, std::min(m_textSizePx.y - m_textRegion->rect.Height(), m_textOffsetPx));
+
+            m_vScroller->vScrollPosition = m_textOffsetPx / m_textSizePx.y;
+            SetBufferCursor(targetLoc);
+            UpdateVisibleLineRange();
+            EnsureCursorVisible();
+        }
+    }
 }
 
 void ZepWindow::SetDisplayRegion(const NRectf& region)
@@ -1584,6 +1603,16 @@ void ZepWindow::DisplayScrollers()
 {
     if (m_vScrollRegion->rect.Empty())
         return;
+
+    auto errors = m_pBuffer->GetErrors();
+    if (!errors.empty())
+    {
+        m_vScroller->SetErrorMarkers(errors, m_textSizePx.y, m_textOffsetPx, m_pBuffer);
+    }
+    else
+    {
+        m_vScroller->ClearErrorMarkers();
+    }
 
     m_vScroller->Display(m_pBuffer->GetTheme());
 

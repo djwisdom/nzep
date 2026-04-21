@@ -1,4 +1,5 @@
 #include "zep/scroller.h"
+#include "zep/buffer.h"
 #include "zep/display.h"
 #include "zep/editor.h"
 #include "zep/theme.h"
@@ -9,6 +10,36 @@
 // same in Qt and ImGui
 namespace Zep
 {
+
+void Scroller::SetErrorMarkers(const std::vector<std::shared_ptr<RangeMarker>>& errors, float totalHeight, float viewStart, ZepBuffer* pBuffer)
+{
+    m_totalTextHeight = totalHeight;
+    m_viewStart = viewStart;
+    m_errorPositions.clear();
+
+    if (totalHeight <= 0.0f || m_mainRegion->rect.Height() <= 0.0f || pBuffer == nullptr)
+        return;
+
+    auto bufferSize = pBuffer->GetWorkingBuffer().size();
+    if (bufferSize == 0)
+        return;
+
+    for (const auto& marker : errors)
+    {
+        auto range = marker->GetRange();
+        float bytePos = (float)range.first;
+        float normalizedPos = bytePos / (float)bufferSize;
+        float yPos = normalizedPos * totalHeight;
+        m_errorPositions.push_back({ yPos, marker });
+    }
+}
+
+void Scroller::ClearErrorMarkers()
+{
+    m_errorPositions.clear();
+    m_totalTextHeight = 0.0f;
+    m_viewStart = 0.0f;
+}
 
 Scroller::Scroller(ZepEditor& editor, Region& parent)
     : ZepComponent(editor)
@@ -165,6 +196,44 @@ void Scroller::Notify(std::shared_ptr<ZepMessage> message)
             }
             else if (m_mainRegion->rect.Contains(message->pos))
             {
+                // Check if clicked on an error indicator
+                if (!m_errorPositions.empty() && m_totalTextHeight > 0.0f)
+                {
+                    float viewportTop = m_viewStart;
+                    float viewportBottom = m_viewStart + (m_mainRegion->rect.Height() * vScrollVisiblePercent * m_totalTextHeight / m_mainRegion->rect.Height());
+
+                    for (const auto& errorPos : m_errorPositions)
+                    {
+                        float yPos = errorPos.first;
+                        bool isAbove = yPos < viewportTop;
+                        bool isBelow = yPos > viewportBottom;
+
+                        if (isAbove || isBelow)
+                        {
+                            float indicatorY;
+                            if (isAbove)
+                            {
+                                indicatorY = m_mainRegion->rect.topLeftPx.y + m_mainRegion->rect.Height() * 0.1f;
+                            }
+                            else
+                            {
+                                indicatorY = m_mainRegion->rect.bottomRightPx.y - m_mainRegion->rect.Height() * 0.1f - 8.0f;
+                            }
+
+                            // Check if click is near the indicator
+                            if (std::abs(message->pos.y - indicatorY) < 15.0f && std::abs(message->pos.x - m_mainRegion->rect.Center().x) < 15.0f)
+                            {
+                                // Broadcast message to scroll to the error
+                                auto pMsg = std::make_shared<ZepMessage>(Msg::GoToMarker, message->pos);
+                                pMsg->spMarker = errorPos.second;
+                                GetEditor().Broadcast(pMsg);
+                                message->handled = true;
+                                return;
+                            }
+                        }
+                    }
+                }
+
                 auto thumbRect = ThumbRect();
                 if (thumbRect.Contains(message->pos))
                 {
@@ -210,6 +279,7 @@ void Scroller::Display(ZepTheme& theme)
     auto mousePos = GetEditor().GetMousePos();
     auto activeColor = theme.GetColor(ThemeColor::WidgetActive);
     auto inactiveColor = theme.GetColor(ThemeColor::WidgetInactive);
+    auto errorColor = theme.GetColor(ThemeColor::Error);
 
     // Scroller background
     display.DrawRectFilled(m_region->rect, theme.GetColor(ThemeColor::WidgetBackground));
@@ -233,6 +303,60 @@ void Scroller::Display(ZepTheme& theme)
 
     // Thumb
     display.DrawRectFilled(thumbRect, thumbRect.Contains(mousePos) || m_scrollState == ScrollState::Drag ? activeColor : inactiveColor);
+
+    // Draw error indicators outside the viewport
+    if (!m_errorPositions.empty() && m_totalTextHeight > 0.0f && m_mainRegion->rect.Height() > 0.0f)
+    {
+        float viewportTop = m_viewStart;
+        float viewportBottom = m_viewStart + (m_mainRegion->rect.Height() * vScrollVisiblePercent * m_totalTextHeight / m_mainRegion->rect.Height());
+
+        for (const auto& errorPos : m_errorPositions)
+        {
+            float yPos = errorPos.first;
+            bool isAbove = yPos < viewportTop;
+            bool isBelow = yPos > viewportBottom;
+
+            if (isAbove || isBelow)
+            {
+                float indicatorY;
+                if (isAbove)
+                {
+                    indicatorY = m_mainRegion->rect.topLeftPx.y + m_mainRegion->rect.Height() * 0.1f;
+                }
+                else
+                {
+                    indicatorY = m_mainRegion->rect.bottomRightPx.y - m_mainRegion->rect.Height() * 0.1f - 8.0f;
+                }
+
+                // Draw arrow indicator
+                NVec2f arrowCenter(m_mainRegion->rect.Center().x, indicatorY);
+                float arrowSize = 6.0f;
+
+                // Triangle pointing up or down
+                std::vector<NVec2f> triangle;
+                if (isAbove)
+                {
+                    triangle = {
+                        NVec2f(arrowCenter.x, arrowCenter.y - arrowSize),
+                        NVec2f(arrowCenter.x - arrowSize, arrowCenter.y + arrowSize),
+                        NVec2f(arrowCenter.x + arrowSize, arrowCenter.y + arrowSize)
+                    };
+                }
+                else
+                {
+                    triangle = {
+                        NVec2f(arrowCenter.x, arrowCenter.y + arrowSize),
+                        NVec2f(arrowCenter.x - arrowSize, arrowCenter.y - arrowSize),
+                        NVec2f(arrowCenter.x + arrowSize, arrowCenter.y - arrowSize)
+                    };
+                }
+
+                display.DrawLine(triangle[0], triangle[1], errorColor, 2.0f);
+                display.DrawLine(triangle[1], triangle[2], errorColor, 2.0f);
+                display.DrawLine(triangle[2], triangle[0], errorColor, 2.0f);
+            }
+        }
+    }
 }
 
 }; // namespace Zep

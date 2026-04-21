@@ -242,6 +242,7 @@ public:
 
     void ForEachMarker(uint32_t types, Direction dir, const GlyphIterator& begin, const GlyphIterator& end, std::function<bool(const std::shared_ptr<RangeMarker>&)> fnCB) const;
     std::shared_ptr<RangeMarker> FindNextMarker(GlyphIterator start, Direction dir, uint32_t markerType);
+    std::vector<std::shared_ptr<RangeMarker>> GetErrors() const;
 
     void SetBufferType(BufferType type);
     BufferType GetBufferType() const;

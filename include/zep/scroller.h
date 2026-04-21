@@ -8,6 +8,7 @@ namespace Zep
 {
 class ZepTheme;
 class ZepEditor;
+class RangeMarker;
 
 class Scroller : public ZepComponent
 {
@@ -16,6 +17,9 @@ public:
 
     virtual void Display(ZepTheme& theme);
     virtual void Notify(std::shared_ptr<ZepMessage> message) override;
+
+    void SetErrorMarkers(const std::vector<std::shared_ptr<RangeMarker>>& errors, float totalHeight, float viewStart, ZepBuffer* pBuffer);
+    void ClearErrorMarkers();
 
     float vScrollVisiblePercent = 1.0f;
     float vScrollPosition = 0.0f;
@@ -54,6 +58,10 @@ private:
     ScrollState m_scrollState = ScrollState::None;
     NVec2f m_mouseDownPos;
     float m_mouseDownPercent;
+
+    std::vector<std::pair<float, std::shared_ptr<RangeMarker>>> m_errorPositions;
+    float m_totalTextHeight = 0.0f;
+    float m_viewStart = 0.0f;
 };
 
 }; // namespace Zep

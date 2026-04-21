@@ -25,7 +25,8 @@ enum
     Search = (1 << 1),
     Widget = (1 << 2),
     LineWidget = (1 << 3),
-    All = (Mark | Search | LineWidget | Widget)
+    Error = (1 << 4),
+    All = (Mark | Search | LineWidget | Widget | Error)
 };
 };
 
