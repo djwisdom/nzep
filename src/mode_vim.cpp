@@ -1,6 +1,10 @@
 #include <cctype>
+#include <memory>
 #include <sstream>
 
+#include "zep/commands_terminal.h"
+#include "zep/editor.h"
+#include "zep/git.h"
 #include "zep/keymap.h"
 #include "zep/mode_search.h"
 #include "zep/mode_vim.h"
@@ -14,10 +18,10 @@
 // Note:
 // This is a very basic implementation of the common Vim commands that I use: the bare minimum I can live with.
 // I do use more, and depending on how much pain I suffer, will add them over time.
-// My aim is to make it easy to add commands, so if you want to put something in, please send me a PR.
+// My aim is to make it easy to add commands, so if you want to put something in, please send a PR.
 // The buffer/display search and find support makes it easy to gather the info you need, and the basic insert/delete undo redo commands
 // make it easy to find the locations in the buffer
-// Important to note: I'm not trying to beat/better Vim here.  Just make an editor I can use in a viewport without feeling pain!
+// Important to note: I'm not trying to beat/better Vim here.  Just make an editor I can use in a viewport without feeling pain.
 // See further down for what is implemented, and what's on my todo list
 
 // IMPLEMENTED VIM:
@@ -33,8 +37,8 @@
 // Arrow keys
 // '$'
 // 'jk' to insert mode
-// gg Jump to end
-// G Jump to beginning
+// 'gg' Jump to end
+// 'G' Jump to beginning
 // CTRL+F/B/D/U page and have page moves
 // 'J' join
 // D
@@ -50,7 +54,7 @@
 // c$  Change to end of line
 // C
 // S, s, with visual modes
-// ^
+// '^'
 // 'O', 'o'
 // 'V' (linewise v)
 // Y, D, linewise yank/paste
@@ -99,6 +103,8 @@ void ZepMode_Vim::AddPasteMaps()
 {
 }
 
+void RegisterVimExCommands(ZepEditor& editor);
+
 void ZepMode_Vim::Init()
 {
     for (int i = 0; i <= 9; i++)
@@ -108,6 +114,9 @@ void ZepMode_Vim::Init()
     GetEditor().SetRegister('"', "");
 
     SetupKeyMaps();
+
+    RegisterVimExCommands(GetEditor());
+    RegisterTerminalCommands(GetEditor());
 }
 
 void ZepMode_Vim::AddNavigationKeyMaps(bool allowInVisualMode)
@@ -266,6 +275,29 @@ void ZepMode_Vim::SetupKeyMaps()
 
     keymap_add({ &m_insertMap }, { "<Return>" }, id_InsertCarriageReturn);
     keymap_add({ &m_insertMap }, { "<Tab>" }, id_InsertTab);
+    keymap_add({ &m_insertMap }, { "<S-Tab>" }, id_Dedent);
+
+    // Macro recording and playback
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "q<.>" }, id_MacroRecord);
+    keymap_add({ &m_normalMap }, { "q" }, id_MacroRecord);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "@<.>" }, id_MacroPlay);
+
+    // Folding
+    AddKeyMapWithCountRegisters({ &m_normalMap, &m_visualMap }, { "zf" }, id_FoldCreate);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "zd" }, id_FoldDelete);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "zD" }, id_FoldDeleteAll);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "zo" }, id_FoldOpen);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "zO" }, id_FoldOpenAll);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "zc" }, id_FoldClose);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "zC" }, id_FoldCloseAll);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "zR" }, id_FoldOpenAll);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "zM" }, id_FoldCloseAll);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "za" }, id_FoldToggle);
+
+    // Multi-cursor keys - Ctrl+d adds cursor at next word, Ctrl+k skips
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "<C-d>", "<C-d>" }, id_MultiCursorAdd);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "<C-k>" }, id_MultiCursorSkip);
+    AddKeyMapWithCountRegisters({ &m_normalMap }, { "<C-S-d>" }, id_MultiCursorSelectAll);
 }
 
 void ZepMode_Vim::Begin(ZepWindow* pWindow)
@@ -294,6 +326,726 @@ void ZepMode_Vim::PreDisplay(ZepWindow& window)
 
         m_currentCommand = "";
     }
+}
+
+class ZepExCommand_Substitute : public ZepExCommand
+{
+public:
+    ZepExCommand_Substitute(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "s";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        if (args.size() < 2)
+        {
+            GetEditor().SetCommandText("Usage: :s/pattern/replacement/[flags]");
+            return;
+        }
+
+        ZepBuffer& buffer = GetEditor().GetActiveWindow()->GetBuffer();
+        auto cursor = GetEditor().GetActiveWindow()->GetBufferCursor();
+        long currentLine = buffer.GetBufferLine(cursor);
+
+        std::string cmdArgs = args[1];
+
+        bool globalAll = false;
+        long lineCount = 1;
+        long startLine = currentLine;
+
+        if (cmdArgs == "%")
+        {
+            globalAll = true;
+            startLine = 0;
+            lineCount = buffer.GetLineCount();
+        }
+        else if (cmdArgs.find('%') == 0)
+        {
+            globalAll = true;
+            cmdArgs = cmdArgs.substr(1);
+            startLine = 0;
+            lineCount = buffer.GetLineCount();
+        }
+        else if (cmdArgs.find('%') != std::string::npos)
+        {
+            globalAll = true;
+            cmdArgs = string_replace(cmdArgs, "%", "");
+            startLine = 0;
+            lineCount = buffer.GetLineCount();
+        }
+        else
+        {
+            long lineNum = 0;
+            for (char c : cmdArgs)
+            {
+                if (isdigit(c))
+                {
+                    lineNum = lineNum * 10 + (c - '0');
+                }
+            }
+            if (lineNum > 0)
+            {
+                startLine = lineNum - 1;
+                lineCount = lineNum;
+                cmdArgs = cmdArgs.substr(cmdArgs.find_first_not_of("0123456789"));
+            }
+        }
+
+        if (cmdArgs.empty())
+        {
+            GetEditor().SetCommandText("Usage: :s/pattern/replacement/[flags]");
+            return;
+        }
+
+        if (cmdArgs[0] == 's' && cmdArgs.length() > 1)
+        {
+            cmdArgs = cmdArgs.substr(1);
+        }
+
+        if (cmdArgs.empty() || cmdArgs[0] != '/')
+        {
+            GetEditor().SetCommandText("Usage: :s/pattern/replacement/[flags]");
+            return;
+        }
+
+        size_t firstSlash = 1;
+        size_t secondSlash = std::string::npos;
+        for (size_t i = 1; i < cmdArgs.length(); i++)
+        {
+            if (cmdArgs[i] == '/' && (i == 1 || cmdArgs[i - 1] != '\\'))
+            {
+                secondSlash = i;
+                break;
+            }
+        }
+
+        if (secondSlash == std::string::npos)
+        {
+            GetEditor().SetCommandText("Invalid format. Use :s/pattern/replacement/[flags]");
+            return;
+        }
+
+        std::string searchPattern = cmdArgs.substr(firstSlash, secondSlash - firstSlash);
+        std::string replacement = cmdArgs.substr(secondSlash + 1);
+        std::string flags;
+
+        size_t flagStart = secondSlash + 1;
+        if (flagStart < cmdArgs.length())
+        {
+            flags = cmdArgs.substr(flagStart);
+        }
+
+        bool doGlobal = false;
+        bool doConfirm = false;
+        bool ignoreCase = false;
+
+        for (char f : flags)
+        {
+            if (f == 'g')
+                doGlobal = true;
+            else if (f == 'c')
+                doConfirm = true;
+            else if (f == 'i')
+                ignoreCase = true;
+        }
+
+        if (ignoreCase)
+        {
+            searchPattern = string_tolower(searchPattern);
+        }
+
+        long substitutions = 0;
+
+        for (long line = startLine; line < startLine + lineCount && line < buffer.GetLineCount(); line++)
+        {
+            ByteRange range;
+            if (!buffer.GetLineOffsets(line, range))
+            {
+                continue;
+            }
+
+            GlyphIterator lineStart(&buffer, range.first);
+            GlyphIterator lineEnd(&buffer, range.second);
+
+            std::string lineText = buffer.GetBufferText(lineStart, lineEnd);
+            std::string searchText = lineText;
+            if (ignoreCase)
+            {
+                searchText = string_tolower(searchText);
+            }
+
+            size_t pos = 0;
+
+            while (true)
+            {
+                pos = searchText.find(searchPattern, pos);
+                if (pos == std::string::npos)
+                {
+                    break;
+                }
+
+                if (doConfirm)
+                {
+                    GetEditor().SetCommandText("Replace at " + std::to_string(line + 1) + "? [y/n/a/q]");
+                }
+
+                GlyphIterator replaceStart(&buffer, range.first + pos);
+                GlyphIterator replaceEnd(&buffer, range.first + pos + searchPattern.length());
+
+                if (doConfirm)
+                {
+                    GetEditor().SetCommandText("Replace (y/n/a/q)? ");
+                }
+                else
+                {
+                    ChangeRecord changeRecord;
+                    buffer.Replace(replaceStart, replaceEnd, replacement, ReplaceRangeMode::Replace, changeRecord);
+                    substitutions++;
+                }
+
+                if (!doGlobal)
+                {
+                    break;
+                }
+
+                pos += replacement.length();
+                if (pos >= searchText.length())
+                {
+                    break;
+                }
+
+                if (!buffer.GetLineOffsets(line, range))
+                {
+                    break;
+                }
+
+                lineStart = GlyphIterator(&buffer, range.first);
+                lineEnd = GlyphIterator(&buffer, range.second);
+                searchText = buffer.GetBufferText(lineStart, lineEnd);
+                if (ignoreCase)
+                {
+                    searchText = string_tolower(searchText);
+                }
+            }
+        }
+
+        GetEditor().SetCommandText(std::to_string(substitutions) + " substitution(s)");
+
+        if (substitutions > 0)
+        {
+            buffer.SetFileFlags((uint32_t)FileFlags::Dirty, true);
+        }
+    }
+};
+
+class ZepExCommand_Quit : public ZepExCommand
+{
+public:
+    ZepExCommand_Quit(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "q";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        auto pWindow = GetEditor().GetActiveWindow();
+        if (!pWindow)
+            return;
+
+        if (args.size() > 1 && args[1] == "a")
+        {
+            auto pTab = GetEditor().GetActiveTabWindow();
+            while (pTab->GetWindows().size() > 1)
+            {
+                pTab->CloseActiveWindow();
+            }
+            if (!pTab->GetWindows().empty())
+            {
+                pTab->CloseActiveWindow();
+            }
+        }
+        else if (args.size() > 1 && args[1] == "!")
+        {
+            pWindow->GetBuffer().ClearFileFlags(FileFlags::Dirty);
+            pWindow->GetTabWindow().CloseActiveWindow();
+        }
+        else
+        {
+            ZepBuffer& buffer = pWindow->GetBuffer();
+            if (buffer.HasFileFlags(FileFlags::Dirty))
+            {
+                GetEditor().SetCommandText("E37: No write since last change (add ! to override)");
+                return;
+            }
+            pWindow->GetTabWindow().CloseActiveWindow();
+        }
+    }
+};
+
+class ZepExCommand_Write : public ZepExCommand
+{
+public:
+    ZepExCommand_Write(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "w";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        auto pWindow = GetEditor().GetActiveWindow();
+        if (!pWindow)
+            return;
+
+        ZepBuffer& buffer = pWindow->GetBuffer();
+
+        if (args.size() > 1 && args[1] != "q")
+        {
+            fs::path filePath = args[1];
+            GetEditor().SaveBufferAs(buffer, filePath);
+            GetEditor().SetCommandText("'" + filePath.filename().string() + "' " + std::to_string(buffer.GetLineCount()) + "L written");
+        }
+        else
+        {
+            GetEditor().SaveBuffer(buffer);
+            GetEditor().SetCommandText("'" + buffer.GetDisplayName() + "' " + std::to_string(buffer.GetLineCount()) + "L written");
+        }
+    }
+};
+
+class ZepExCommand_WriteQuit : public ZepExCommand
+{
+public:
+    ZepExCommand_WriteQuit(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "wq";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        auto pWindow = GetEditor().GetActiveWindow();
+        if (!pWindow)
+            return;
+
+        ZepBuffer& buffer = pWindow->GetBuffer();
+
+        if (args.size() > 1 && args[1] != "q")
+        {
+            fs::path filePath = args[1];
+            GetEditor().SaveBufferAs(buffer, filePath);
+        }
+        else
+        {
+            GetEditor().SaveBuffer(buffer);
+        }
+        pWindow->GetTabWindow().CloseActiveWindow();
+    }
+};
+
+class ZepExCommand_ListBuffers : public ZepExCommand
+{
+public:
+    ZepExCommand_ListBuffers(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "buffers";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        std::ostringstream str;
+        auto buffers = GetEditor().GetBuffers();
+        auto pActiveBuffer = GetEditor().GetActiveBuffer();
+
+        int idx = 0;
+        for (auto& buff : buffers)
+        {
+            str << (buff.get() == pActiveBuffer ? "%" : " ");
+            str << "  " << ++idx << " ";
+
+            if (buff->HasFileFlags(FileFlags::Dirty))
+                str << "+";
+            else
+                str << " ";
+
+            str << " \"" << buff->GetDisplayName() << "\"" << "\n";
+        }
+
+        GetEditor().SetCommandText(str.str());
+    }
+};
+
+class ZepExCommand_Ls : public ZepExCommand
+{
+public:
+    ZepExCommand_Ls(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "ls";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        ZepExCommand_ListBuffers cmd(GetEditor());
+        cmd.Run(args);
+    }
+};
+
+class ZepExCommand_Global : public ZepExCommand
+{
+public:
+    ZepExCommand_Global(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "g";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        if (args.size() < 2)
+        {
+            GetEditor().SetCommandText("Usage: :g/pattern/command");
+            return;
+        }
+
+        auto pWindow = GetEditor().GetActiveWindow();
+        if (!pWindow)
+            return;
+
+        std::string cmdArgs = args[1];
+        if (cmdArgs.empty() || cmdArgs[0] != '/')
+        {
+            GetEditor().SetCommandText("Usage: :g/pattern/command");
+            return;
+        }
+
+        size_t secondSlash = std::string::npos;
+        for (size_t i = 1; i < cmdArgs.length(); i++)
+        {
+            if (cmdArgs[i] == '/' && (i == 1 || cmdArgs[i - 1] != '\\'))
+            {
+                secondSlash = i;
+                break;
+            }
+        }
+
+        if (secondSlash == std::string::npos)
+        {
+            GetEditor().SetCommandText("Invalid pattern. Use :g/pattern/command");
+            return;
+        }
+
+        std::string pattern = cmdArgs.substr(1, secondSlash - 1);
+        std::string subCommand;
+        if (secondSlash + 1 < cmdArgs.length())
+        {
+            subCommand = cmdArgs.substr(secondSlash + 1);
+        }
+
+        ZepBuffer& buffer = pWindow->GetBuffer();
+        std::vector<long> matchingLines;
+
+        bool ignoreCase = false;
+        std::string searchPattern = pattern;
+        if (!pattern.empty() && pattern[0] == '\\' && pattern.length() > 1)
+        {
+            if (pattern[1] == 'c')
+            {
+                ignoreCase = true;
+                searchPattern = pattern.substr(2);
+            }
+        }
+
+        if (ignoreCase)
+        {
+            searchPattern = string_tolower(searchPattern);
+        }
+
+        for (long line = 0; line < buffer.GetLineCount(); line++)
+        {
+            ByteRange range;
+            if (!buffer.GetLineOffsets(line, range))
+                continue;
+
+            GlyphIterator lineStart(&buffer, range.first);
+            GlyphIterator lineEnd(&buffer, range.second);
+            std::string lineText = buffer.GetBufferText(lineStart, lineEnd);
+
+            std::string searchText = lineText;
+            if (ignoreCase)
+                searchText = string_tolower(searchText);
+
+            if (searchText.find(searchPattern) != std::string::npos)
+            {
+                matchingLines.push_back(line);
+            }
+        }
+
+        long count = 0;
+        if (subCommand == "d" || subCommand == "delete")
+        {
+            for (auto it = matchingLines.rbegin(); it != matchingLines.rend(); ++it)
+            {
+                long line = *it;
+                ByteRange range;
+                if (buffer.GetLineOffsets(line, range))
+                {
+                    GlyphIterator start(&buffer, range.first);
+                    GlyphIterator end(&buffer, range.second);
+                    ChangeRecord changeRecord;
+                    buffer.Delete(start, end, changeRecord);
+                    count++;
+                }
+            }
+            GetEditor().SetCommandText(std::to_string(count) + " line(s) deleted");
+        }
+        else if (subCommand == "p" || subCommand == "print")
+        {
+            std::ostringstream str;
+            for (long line : matchingLines)
+            {
+                ByteRange range;
+                if (buffer.GetLineOffsets(line, range))
+                {
+                    GlyphIterator lineStart(&buffer, range.first);
+                    GlyphIterator lineEnd(&buffer, range.second);
+                    std::string lineText = buffer.GetBufferText(lineStart, lineEnd);
+                    str << line + 1 << " " << lineText << "\n";
+                }
+            }
+            GetEditor().SetCommandText(str.str());
+        }
+        else if (!subCommand.empty())
+        {
+            GetEditor().SetCommandText("Unsupported command: " + subCommand);
+        }
+        else
+        {
+            GetEditor().SetCommandText(std::to_string(matchingLines.size()) + " match(es) for pattern");
+        }
+    }
+};
+
+class ZepExCommand_Next : public ZepExCommand
+{
+public:
+    ZepExCommand_Next(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "n";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        auto buffers = GetEditor().GetBuffers();
+        if (buffers.size() <= 1)
+        {
+            GetEditor().SetCommandText("No other file in buffer list");
+            return;
+        }
+
+        auto pCurrentBuffer = GetEditor().GetActiveBuffer();
+        auto itr = std::find_if(buffers.begin(), buffers.end(), [pCurrentBuffer](const std::shared_ptr<ZepBuffer>& buff) {
+            return buff.get() == pCurrentBuffer;
+        });
+
+        if (itr != buffers.end())
+        {
+            ++itr;
+            if (itr == buffers.end())
+                itr = buffers.begin();
+            GetEditor().EnsureWindow(**itr);
+        }
+    }
+};
+
+void RegisterVimExCommands(ZepEditor& editor)
+{
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Substitute>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Quit>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Write>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_WriteQuit>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_ListBuffers>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Ls>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Global>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Next>(editor));
+
+    // Git commands - disabled (requires full git component)
+    // if (auto spGit = editor.GetGit())
+    // {
+    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitStatus>(editor, spGit));
+    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitDiff>(editor, spGit));
+    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_VGitDiff>(editor, spGit));
+    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitBlame>(editor, spGit));
+    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitCommit>(editor, spGit));
+    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitPush>(editor, spGit));
+    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitPull>(editor, spGit));
+    // }
+}
+
+bool ZepMode_Vim::GetCommand(CommandContext& context)
+{
+    auto mappedCommand = context.keymap.foundMapping;
+
+    if (mappedCommand == id_MacroRecord)
+    {
+        if (m_recordingRegister != 0)
+        {
+            StopRecording();
+        }
+        else
+        {
+            if (!context.keymap.captureChars.empty())
+            {
+                char reg = context.keymap.captureChars[0];
+                StartRecording(reg);
+            }
+        }
+        context.commandResult.flags = CommandResultFlags::HandledCount;
+        return true;
+    }
+    else if (mappedCommand == id_MacroPlay)
+    {
+        char reg = 0;
+        if (!context.keymap.captureChars.empty())
+        {
+            reg = context.keymap.captureChars[0];
+        }
+        else if (m_lastPlaybackRegister != 0)
+        {
+            reg = m_lastPlaybackRegister;
+        }
+
+        if (reg != 0)
+        {
+            int count = context.keymap.TotalCount();
+            PlayMacro(reg, count);
+        }
+        context.commandResult.flags = CommandResultFlags::HandledCount;
+        return true;
+    }
+
+    return ZepMode::GetCommand(context);
+}
+
+bool ZepMode_Vim::IsValidRegister(char reg) const
+{
+    return ((reg >= 'a' && reg <= 'z') || (reg >= '0' && reg <= '9'));
+}
+
+void ZepMode_Vim::StartRecording(char reg)
+{
+    if (!IsValidRegister(reg))
+    {
+        GetEditor().SetCommandText("Invalid register");
+        return;
+    }
+
+    m_recordingRegister = reg;
+    m_macros[reg] = "";
+    GetEditor().SetCommandText("recording @" + std::string(1, reg));
+}
+
+void ZepMode_Vim::StopRecording()
+{
+    if (m_recordingRegister != 0)
+    {
+        GetEditor().SetCommandText("recorded @" + std::string(1, m_recordingRegister));
+        m_recordingRegister = 0;
+    }
+}
+
+std::string ZepMode_Vim::GetRegisterValue(char reg) const
+{
+    auto it = m_macros.find(reg);
+    if (it != m_macros.end())
+    {
+        return it->second;
+    }
+    return "";
+}
+
+void ZepMode_Vim::PlayMacro(char reg, int count)
+{
+    if (!IsValidRegister(reg))
+    {
+        GetEditor().SetCommandText("Invalid register");
+        return;
+    }
+
+    std::string macro = GetRegisterValue(reg);
+    if (macro.empty())
+    {
+        GetEditor().SetCommandText("Register @" + std::string(1, reg) + " is empty");
+        return;
+    }
+
+    m_lastPlaybackRegister = reg;
+
+    for (int i = 0; i < count; i++)
+    {
+        for (char key : macro)
+        {
+            HandleMappedInput(std::string(1, key));
+        }
+    }
+}
+
+void ZepMode_Vim::AddKeyPress(uint32_t key, uint32_t modifierKeys)
+{
+    if (m_recordingRegister != 0)
+    {
+        if (key == ExtKeys::ESCAPE)
+        {
+            StopRecording();
+            return;
+        }
+
+        std::string input = ConvertInputToMapString(key, modifierKeys);
+        if (!input.empty())
+        {
+            m_macros[m_recordingRegister] += input;
+        }
+        return;
+    }
+
+    ZepMode::AddKeyPress(key, modifierKeys);
 }
 
 } // namespace Zep

@@ -62,12 +62,14 @@ using fnMatch = std::function<bool>(const char);
 ZepBuffer::ZepBuffer(ZepEditor& editor, const std::string& strName)
     : ZepComponent(editor)
     , m_strName(strName)
+    , m_fold(*this)
 {
     Clear();
 }
 
 ZepBuffer::ZepBuffer(ZepEditor& editor, const fs::path& path)
     : ZepComponent(editor)
+    , m_fold(*this)
 {
     Load(path);
 }
@@ -1196,13 +1198,12 @@ bool ZepBuffer::Replace(const GlyphIterator& startIndex, const GlyphIterator& en
     // We are about to modify this range
     GetEditor().Broadcast(std::make_shared<BufferMessage>(this, BufferMessageType::PreBufferChange, startIndex, endIndex));
 
-    // Perform a fill
-    for (auto loc = startIndex; loc < endIndex; loc++)
-    {
-        // Note we don't support utf8 yet
-        // TODO: (0) Broken now we support utf8
-        m_workingBuffer[loc.Index()] = str[0];
-    }
+    // For UTF-8, we need to delete and re-insert to properly handle multi-byte characters
+    // This is the same approach as ReplaceRangeMode::Replace
+    Delete(startIndex, endIndex, changeRecord);
+
+    ChangeRecord tempRecord;
+    Insert(startIndex, str, tempRecord);
 
     MarkUpdate();
 
@@ -1301,8 +1302,7 @@ GlyphRange ZepBuffer::GetInclusiveSelection() const
 void ZepBuffer::SetSelection(const GlyphRange& selection)
 {
     m_selection = selection;
-    if (m_selection.first.Valid() && m_selection.second.Valid() &&
-        (m_selection.first > m_selection.second))
+    if (m_selection.first.Valid() && m_selection.second.Valid() && (m_selection.first > m_selection.second))
     {
         std::swap(m_selection.first, m_selection.second);
     }
@@ -1758,6 +1758,46 @@ ZepBuffer* ZepBuffer::FromHandle(ZepEditor& editor, uint64_t handle)
     return editor.GetBufferFromHandle(handle);
 }
 
+std::string ZepBuffer::GetLineIndentation(GlyphIterator location) const
+{
+    auto lineStart = GetLinePos(location, LineLocation::LineBegin);
+    auto lineEnd = GetLinePos(location, LineLocation::LineFirstGraphChar);
+
+    std::string indent;
+    for (auto itr = lineStart; itr < lineEnd && itr.Valid(); itr++)
+    {
+        char ch = itr.Char();
+        if (ch == ' ' || ch == '\t')
+        {
+            indent += ch;
+        }
+        else
+        {
+            break;
+        }
+    }
+    return indent;
+}
+
+std::string ZepBuffer::GetPrevLineIndentation(GlyphIterator location) const
+{
+    location.Clamp();
+
+    auto lineInfo = GetLinePos(location, LineLocation::LineBegin);
+    if (lineInfo == Begin())
+    {
+        return std::string();
+    }
+
+    auto prevLineEnd = lineInfo.Peek(-1);
+    if (!prevLineEnd.Valid())
+    {
+        return std::string();
+    }
+
+    return GetLineIndentation(prevLineEnd);
+}
+
 const std::string& ZepBuffer::GetName() const
 {
     if (!m_filePath.empty() && m_filePath.has_filename())
@@ -1766,7 +1806,7 @@ const std::string& ZepBuffer::GetName() const
     }
     return m_strName;
 }
-    
+
 std::stack<std::shared_ptr<ZepCommand>>& ZepBuffer::GetUndoStack()
 {
     return m_undoStack;
@@ -1857,6 +1897,46 @@ GlyphIterator ZepBuffer::FindMatchingParen(GlyphIterator bufferCursor)
         }
     }
     return GlyphIterator();
+}
+
+long ZepBuffer::GetVisibleLineCount() const
+{
+    return m_fold.GetVisibleLineCount();
+}
+
+long ZepBuffer::BufferToVisibleLine(long bufferLine) const
+{
+    long visibleLine = bufferLine;
+    const auto& folds = m_fold.GetFolds();
+
+    for (auto& pFold : folds)
+    {
+        if (!pFold->isOpen && bufferLine > pFold->startLine)
+        {
+            long hiddenLines = std::min(bufferLine, pFold->endLine) - pFold->startLine;
+            visibleLine -= hiddenLines;
+        }
+    }
+
+    return visibleLine;
+}
+
+long ZepBuffer::VisibleToBufferLine(long visibleLine) const
+{
+    long bufferLine = visibleLine;
+    const auto& folds = m_fold.GetFolds();
+
+    for (auto& pFold : folds)
+    {
+        if (!pFold->isOpen && visibleLine < pFold->startLine)
+        {
+            long hiddenLines = pFold->endLine - pFold->startLine;
+            bufferLine = pFold->startLine;
+            bufferLine += hiddenLines;
+        }
+    }
+
+    return bufferLine;
 }
 
 } // namespace Zep

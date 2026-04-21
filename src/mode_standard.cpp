@@ -1,4 +1,5 @@
 #include "zep/mode_standard.h"
+#include "zep/commands_terminal.h"
 #include "zep/mcommon/string/stringutils.h"
 
 // Note:
@@ -34,6 +35,9 @@ ZepMode_Standard::~ZepMode_Standard()
 
 void ZepMode_Standard::Init()
 {
+    // Register terminal commands
+    RegisterTerminalCommands(GetEditor());
+
     // In standard mode, we always show the insert cursor type
     m_visualCursorType = CursorType::Insert;
 
@@ -49,6 +53,7 @@ void ZepMode_Standard::Init()
     keymap_add({ &m_insertMap }, { "<Backspace>" }, id_Backspace);
     keymap_add({ &m_insertMap }, { "<Return>" }, id_InsertCarriageReturn);
     keymap_add({ &m_insertMap }, { "<Tab>" }, id_InsertTab);
+    keymap_add({ &m_insertMap }, { "<S-Tab>" }, id_Dedent);
     keymap_add({ &m_insertMap, &m_visualMap }, { "<Del>" }, id_Delete);
     keymap_add({ &m_insertMap, &m_visualMap }, { "<C-S-z>", "<C-y>" }, id_Redo);
     keymap_add({ &m_insertMap, &m_visualMap }, { "<C-z>", "<C-u>" }, id_Undo);
@@ -86,6 +91,11 @@ void ZepMode_Standard::Init()
     keymap_add({ &m_visualMap, &m_insertMap }, { "<C-->" }, id_FontSmaller);
 
     keymap_add({ &m_visualMap, &m_insertMap }, { "<C-s>" }, id_Save);
+
+    // Multi-cursor keys
+    keymap_add({ &m_normalMap, &m_visualMap }, { "<C-d>", "<C-d>" }, id_MultiCursorAdd);
+    keymap_add({ &m_normalMap, &m_visualMap }, { "<C-k>" }, id_MultiCursorSkip);
+    keymap_add({ &m_normalMap, &m_visualMap }, { "<C-S-d>" }, id_MultiCursorSelectAll);
 }
 
 void ZepMode_Standard::Begin(ZepWindow* pWindow)

@@ -111,7 +111,155 @@ Essential Vim commands implemented:
 
 ---
 
+## v0.3.0 - Extended Features Update
+
+### 5. Macros (q recording) - NEW
+
+**Location:** `src/mode_vim.cpp`, `include/zep/keymap.h`, `include/zep/mode_vim.h`
+
+Record and playback keystrokes:
+
+| Command | Description |
+|---------|-------------|
+| `qa` | Start recording macro to register a |
+| `q` | Stop recording |
+| `@a` | Play back macro from register a |
+| `@@` | Repeat last macro |
+| `10@a` | Play macro 10 times |
+
+**Usage:**
+```vim
+qa                  " Start recording
+iHello World<Esc>  " Type some stuff
+q                   " Stop recording
+@a                  " Replay: "Hello World" appears
+@@                  " Replay again
+```
+
+---
+
+### 6. Folds - NEW
+
+**Location:** `include/zep/fold.h`, `src/fold.cpp`
+
+Code folding with visual indicators:
+
+| Command | Description |
+|---------|-------------|
+| `zf` | Create fold (from selection or count) |
+| `zd` | Delete fold at cursor |
+| `zD` | Delete all folds |
+| `zo` | Open fold |
+| `zO` | Open all folds |
+| `zc` | Close fold |
+| `zC` | Close all folds |
+| `zR` | Open all folds |
+| `zM` | Close all folds |
+| `za` | Toggle fold |
+
+**Features:**
+- Fold by markers
+- Fold by indentation (Python)
+- +/- indicators in gutter
+
+---
+
+### 7. Multiple Cursors - NEW
+
+**Location:** `include/zep/window.h`, `src/window.cpp`
+
+Multi-cursor editing (Sublime/VS Code style):
+
+| Command | Description |
+|---------|-------------|
+| `Ctrl+d` | Add cursor at next word match |
+| `Ctrl+k` | Skip current, go to next |
+| `Ctrl+Shift+d` | Select all matches |
+| Type | Applies to all cursors |
+| Escape | Exit multi-cursor mode |
+
+**Usage:**
+- Place cursor on word
+- Ctrl+d to add next occurrence
+- Type to edit all at once
+
+---
+
+### 8. Minimap - NEW
+
+**Location:** `src/window.cpp`, `src/theme.cpp`
+
+Code overview on the right side:
+
+- Shows entire file in miniature
+- Syntax highlighting visible
+- Current viewport indicated (draggable)
+- Click to jump to location
+- Configure: `:set minimap`, `:set minimapwidth=100`
+
+---
+
+### 9. Git Integration - NEW
+
+**Location:** `include/zep/git.h`, `src/git.cpp`
+
+Git features in editor:
+
+| Command | Description |
+|---------|-------------|
+| (gutter) | Added (green), Modified (yellow), Deleted (red) |
+| `:Gstatus` | Show git status |
+| `:GBlame` | Show commit info per line |
+| `:Gdiff` | Show changes vs HEAD |
+| `:Gcommit <msg>` | Commit changes |
+| `:Gpush` | Push to remote |
+| `:Gpull` | Pull from remote |
+
+---
+
+### 10. Terminal Emulator - NEW
+
+**Location:** `include/zep/terminal.h`, `src/terminal.cpp`, `include/zep/mode_terminal.h`
+
+Run commands in editor:
+
+| Command | Description |
+|---------|-------------|
+| `:terminal` | Open interactive terminal |
+| `:!cmd` | Run command and show output |
+
+**Features:**
+- ANSI color support
+- Interactive shell
+- Scrollback buffer
+
+---
+
+### 11. Complete Visual Mode - ENHANCED
+
+**Location:** `src/mode_vim.cpp`
+
+Visual mode improvements:
+
+| Command | Description |
+|---------|-------------|
+| `v` | Character-wise selection |
+| `V` | Line-wise selection |
+| `Ctrl+v` | Block-wise selection |
+
+All standard visual operators work:
+- `d` - delete selection
+- `y` - yank selection
+- `c` - change selection
+- `>` / `<` - shift
+- `~` - toggle case
+- `u` / `U` - lower/upper case
+
+---
+
 ## v0.1.0 - Original Zep + nZep
+
+See original README for base features.
 
 ### Editor Features
 - Modal (Vim) + modeless (Standard) editing

@@ -1,4 +1,4 @@
-# Zep Notifications - User Manual
+# nZep Notifications - User Manual
 ## Because Your Time Shouldn't Be Wasted Context-Switching
 
 *Created for developers who actually care about getting things done.*
@@ -7,7 +7,7 @@
 
 ## Wait, What Is This Thing?
 
-Look, let me be straight with you - notifications are broken. They're either a flood of useless noise or a deafening silence when something's actually on fire. The Zep Notification System is different - it's built for developers who need **actionable information**, not "hey someone commented on your PR" spam.
+Look, let me be straight with you - notifications are broken. They're either a flood of useless noise or a deafening silence when something's actually on fire. The nZep Notification System is different - it's built for developers who need **actionable information**, not "hey someone commented on your PR" spam.
 
 Think of it as a command center for your dev workflow. Build fails? You'll know *exactly* what's wrong and *where*. Tests tanking? Here's the first failing test. Deploy borked? Boom - here's the error, the file, and a link to the full story. All in one line that answers: "Should I interrupt what I'm doing?"
 

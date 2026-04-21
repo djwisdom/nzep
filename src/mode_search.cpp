@@ -101,10 +101,9 @@ void ZepMode_Search::AddKeyPress(uint32_t key, uint32_t modifiers)
         {
             m_window.MoveCursorY(-1);
         }
-        // TODO: UTF8
         else if (std::isgraph(key))
         {
-            m_searchTerm += char(key);
+            m_searchTerm += utf8_from_codepoint(key);
             UpdateTree();
         }
     }

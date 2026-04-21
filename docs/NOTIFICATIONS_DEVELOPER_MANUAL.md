@@ -1,4 +1,4 @@
-# Zep Notifications - Developer Manual
+# nZep Notifications - Developer Manual
 ## Hook It Into Your Workflow
 
 *This is where we get into the weeds. Let's go.*

@@ -104,4 +104,74 @@ void ZepCommand_ReplaceRange::Undo()
     }
 }
 
+// Multi-cursor Insert - insert at multiple positions
+ZepCommand_MultiCursorInsert::ZepCommand_MultiCursorInsert(ZepBuffer& buffer, const std::vector<GlyphIterator>& cursorPositions, const std::string& str)
+    : ZepCommand(buffer, cursorPositions.empty() ? GlyphIterator() : cursorPositions[0], GlyphIterator())
+    , m_cursorPositions(cursorPositions)
+    , m_strInsert(str)
+{
+    for (const auto& pos : m_cursorPositions)
+    {
+        auto endPos = pos.PeekByteOffset(long(str.size()));
+        m_endPositions.push_back(endPos);
+    }
+}
+
+void ZepCommand_MultiCursorInsert::Redo()
+{
+    for (size_t i = 0; i < m_cursorPositions.size(); i++)
+    {
+        if (m_cursorPositions[i].Valid())
+        {
+            ChangeRecord tempRecord;
+            m_buffer.Insert(m_cursorPositions[i], m_strInsert, tempRecord);
+        }
+    }
+}
+
+void ZepCommand_MultiCursorInsert::Undo()
+{
+    for (size_t i = 0; i < m_cursorPositions.size(); i++)
+    {
+        if (m_cursorPositions[i].Valid() && i < m_endPositions.size())
+        {
+            ChangeRecord tempRecord;
+            m_buffer.Delete(m_cursorPositions[i], m_endPositions[i], tempRecord);
+        }
+    }
+}
+
+// Multi-cursor Delete - delete multiple ranges
+ZepCommand_MultiCursorDelete::ZepCommand_MultiCursorDelete(ZepBuffer& buffer, const std::vector<std::pair<GlyphIterator, GlyphIterator>>& ranges)
+    : ZepCommand(buffer, ranges.empty() ? GlyphIterator() : ranges[0].first, ranges.empty() ? GlyphIterator() : ranges[0].first)
+    , m_ranges(ranges)
+{
+}
+
+void ZepCommand_MultiCursorDelete::Redo()
+{
+    m_deletedTexts.clear();
+    for (const auto& range : m_ranges)
+    {
+        if (range.first.Valid() && range.second.Valid() && range.first != range.second)
+        {
+            ChangeRecord tempRecord;
+            m_deletedTexts.push_back(m_buffer.GetBufferText(range.first, range.second));
+            m_buffer.Delete(range.first, range.second, tempRecord);
+        }
+    }
+}
+
+void ZepCommand_MultiCursorDelete::Undo()
+{
+    for (size_t i = 0; i < m_ranges.size() && i < m_deletedTexts.size(); i++)
+    {
+        if (m_ranges[i].first.Valid() && !m_deletedTexts[i].empty())
+        {
+            ChangeRecord tempRecord;
+            m_buffer.Insert(m_ranges[i].first, m_deletedTexts[i], tempRecord);
+        }
+    }
+}
+
 } // namespace Zep

@@ -1,5 +1,6 @@
 #include "zep/editor.h"
 #include "zep/filesystem.h"
+#include "zep/git.h"
 #include "zep/indexer.h"
 #include "zep/mode_search.h"
 #include "zep/mode_standard.h"
@@ -108,6 +109,8 @@ ZepEditor::ZepEditor(ZepDisplay* pDisplay, const fs::path& configRoot, uint32_t 
     m_commandLines.push_back("");
 
     RegisterSyntaxProviders(*this);
+
+    m_spGit = std::make_shared<ZepGit>(*this);
 
     m_editorRegion = std::make_shared<Region>();
     m_editorRegion->layoutType = RegionLayoutType::VBox;

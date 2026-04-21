@@ -8,6 +8,8 @@
 #include "zep/syntax.h"
 #include "zep/tab_window.h"
 
+#include <cstdio>
+
 namespace Zep
 {
 CommandContext::CommandContext(const std::string& commandIn, ZepMode& md, EditorMode editorMode)
@@ -368,7 +370,7 @@ void ZepMode::AddKeyPress(uint32_t key, uint32_t modifierKeys)
     key &= 0xFF;
 
     // Keys in this range converted to UTF8.  I need to figure out how to generically receive UTF8 here, but this
-    // temporary fix enables £-sign and other specials to display and work correctly
+    // temporary fix enables ï¿½-sign and other specials to display and work correctly
     if (key >= 127 && key <= 255)
     {
 
@@ -927,6 +929,136 @@ bool ZepMode::GetCommand(CommandContext& context)
         Undo();
         return true;
     }
+    else if (mappedCommand == id_FoldCreate)
+    {
+        auto startLine = buffer.GetBufferLine(GetCurrentWindow()->GetBufferCursor());
+        long endLine = startLine + context.keymap.TotalCount();
+        if (endLine > startLine)
+        {
+            buffer.GetFold().CreateFoldFromSelection(startLine, endLine);
+        }
+        return true;
+    }
+    else if (mappedCommand == id_FoldDelete)
+    {
+        auto line = buffer.GetBufferLine(GetCurrentWindow()->GetBufferCursor());
+        buffer.GetFold().RemoveFold(line);
+        return true;
+    }
+    else if (mappedCommand == id_FoldDeleteAll)
+    {
+        buffer.GetFold().RemoveAllFolds();
+        return true;
+    }
+    else if (mappedCommand == id_FoldOpen)
+    {
+        auto line = buffer.GetBufferLine(GetCurrentWindow()->GetBufferCursor());
+        buffer.GetFold().OpenFold(line);
+        return true;
+    }
+    else if (mappedCommand == id_FoldOpenAll)
+    {
+        buffer.GetFold().OpenAllFolds();
+        return true;
+    }
+    else if (mappedCommand == id_FoldClose)
+    {
+        auto line = buffer.GetBufferLine(GetCurrentWindow()->GetBufferCursor());
+        buffer.GetFold().CloseFold(line);
+        return true;
+    }
+    else if (mappedCommand == id_FoldCloseAll)
+    {
+        buffer.GetFold().CloseAllFolds();
+        return true;
+    }
+    else if (mappedCommand == id_FoldToggle)
+    {
+        auto line = buffer.GetBufferLine(GetCurrentWindow()->GetBufferCursor());
+        buffer.GetFold().ToggleFold(line);
+        return true;
+    }
+    else if (mappedCommand == id_MultiCursorAdd)
+    {
+        // Ctrl+d in normal mode - add cursor at next word under cursor
+        auto pWindow = GetCurrentWindow();
+        if (pWindow && pWindow->IsMultiCursorMode())
+        {
+            // If already in multi-cursor mode, the cursor is at the main cursor
+            // Find next word after current cursor position and add cursor
+            auto cursor = pWindow->GetBufferCursor();
+            auto wordRange = buffer.AWordMotion(cursor, SearchType::Word);
+            pWindow->AddCursorAt(wordRange.second);
+            // Move main cursor to the word end
+            pWindow->SetBufferCursor(wordRange.second);
+        }
+        else
+        {
+            // Enter multi-cursor mode - select word under cursor
+            auto wordRange = buffer.AWordMotion(bufferCursor, SearchType::Word);
+            context.beginRange = bufferCursor;
+            context.endRange = wordRange.second;
+            pWindow->SetMultiCursorMode(true);
+            pWindow->AddCursorAt(wordRange.second);
+        }
+        return true;
+    }
+    else if (mappedCommand == id_MultiCursorSkip)
+    {
+        // Ctrl+k - skip current and go to next
+        auto pWindow = GetCurrentWindow();
+        if (pWindow && pWindow->IsMultiCursorMode())
+        {
+            // Remove cursor at current position (in extra cursors list), find next and add
+            auto& cursors = pWindow->GetAllCursors();
+            if (!cursors.empty())
+            {
+                auto currentPos = cursors[0];
+                pWindow->RemoveCursorAt(currentPos);
+
+                // Find next word from main cursor position
+                auto wordRange = buffer.AWordMotion(pWindow->GetBufferCursor(), SearchType::Word);
+                pWindow->SetBufferCursor(wordRange.second);
+                pWindow->AddCursorAt(wordRange.second);
+            }
+        }
+        return true;
+    }
+    else if (mappedCommand == id_MultiCursorSelectAll)
+    {
+        // Ctrl+shift+d or similar - select all occurrences
+        auto pWindow = GetCurrentWindow();
+        if (pWindow)
+        {
+            pWindow->SetMultiCursorMode(true);
+            // Add all word positions starting from current
+            auto cursor = pWindow->GetBufferCursor();
+            while (cursor.Valid())
+            {
+                auto wordRange = buffer.AWordMotion(cursor, SearchType::Word);
+                if (wordRange.second != cursor)
+                {
+                    pWindow->AddCursorAt(wordRange.second);
+                }
+                cursor = wordRange.second;
+                if (!cursor.Valid() || cursor == buffer.End())
+                    break;
+                // Move forward a bit to find next word
+                buffer.Move(cursor, Direction::Forward);
+            }
+        }
+        return true;
+    }
+    else if (mappedCommand == id_MultiCursorMode)
+    {
+        // Exit multi-cursor mode on Escape
+        auto pWindow = GetCurrentWindow();
+        if (pWindow && pWindow->IsMultiCursorMode())
+        {
+            pWindow->SetMultiCursorMode(false);
+            return true;
+        }
+    }
     else if (mappedCommand == id_MotionLineEnd)
     {
         GetCurrentWindow()->SetBufferCursor(context.buffer.GetLinePos(bufferCursor, LineLocation::LineLastNonCR));
@@ -1314,7 +1446,58 @@ bool ZepMode::GetCommand(CommandContext& context)
     else if (mappedCommand == id_InsertCarriageReturn)
     {
         context.beginRange = context.bufferCursor;
-        context.tempReg.text = "\n";
+
+        std::string insertText = "\n";
+
+        if (ZTestFlags(GetEditor().GetFlags(), ZepEditorFlags::AutoIndent))
+        {
+            auto currentLineStart = context.buffer.GetLinePos(context.bufferCursor, LineLocation::LineBegin);
+            auto currentLineEnd = context.buffer.GetLinePos(context.bufferCursor, LineLocation::LineCRBegin);
+            std::string currentLine = context.buffer.GetBufferText(currentLineStart, currentLineEnd);
+
+            bool useTabIndent = context.buffer.HasFileFlags(FileFlags::InsertTabs);
+            std::string indentStr = useTabIndent ? "\t" : "    ";
+
+            if (!currentLine.empty())
+            {
+                char lastChar = currentLine.back();
+                if (lastChar == '{')
+                {
+                    insertText += currentLine + indentStr;
+                }
+                else if (lastChar == '}')
+                {
+                    auto prevIndent = context.buffer.GetPrevLineIndentation(context.bufferCursor);
+                    std::string newIndent;
+                    if (!prevIndent.empty())
+                    {
+                        if (prevIndent.back() == '\t')
+                        {
+                            newIndent = prevIndent.substr(0, prevIndent.size() - 1);
+                        }
+                        else if (prevIndent.size() >= 4 && prevIndent.substr(prevIndent.size() - 4) == "    ")
+                        {
+                            newIndent = prevIndent.substr(0, prevIndent.size() - 4);
+                        }
+                        else
+                        {
+                            newIndent = prevIndent;
+                        }
+                    }
+                    insertText += newIndent;
+                }
+                else
+                {
+                    insertText += context.buffer.GetPrevLineIndentation(context.bufferCursor);
+                }
+            }
+            else
+            {
+                insertText += context.buffer.GetPrevLineIndentation(context.bufferCursor);
+            }
+        }
+
+        context.tempReg.text = insertText;
         context.pRegister = &context.tempReg;
         context.op = CommandOperation::Insert;
         context.commandResult.modeSwitch = EditorMode::Insert;
@@ -1335,6 +1518,37 @@ bool ZepMode::GetCommand(CommandContext& context)
         context.op = CommandOperation::Insert;
         context.commandResult.modeSwitch = EditorMode::Insert;
         context.commandResult.flags = ZSetFlags(context.commandResult.flags, CommandResultFlags::BeginUndoGroup, shouldGroupInserts);
+    }
+    else if (mappedCommand == id_Dedent)
+    {
+        auto currentLineStart = context.buffer.GetLinePos(context.bufferCursor, LineLocation::LineBegin);
+        auto currentIndent = context.buffer.GetLineIndentation(context.bufferCursor);
+
+        if (!currentIndent.empty())
+        {
+            std::string newIndent;
+            if (currentIndent.front() == '\t')
+            {
+                newIndent = currentIndent.substr(1);
+            }
+            else if (currentIndent.size() >= 4 && currentIndent.substr(0, 4) == "    ")
+            {
+                newIndent = currentIndent.substr(4);
+            }
+            else
+            {
+                newIndent = currentIndent;
+            }
+
+            context.beginRange = currentLineStart;
+            context.endRange = currentLineStart.PeekByteOffset(long(currentIndent.size()));
+            context.tempReg.text = newIndent;
+            context.pRegister = &context.tempReg;
+            context.op = CommandOperation::Replace;
+            context.replaceRangeMode = ReplaceRangeMode::Replace;
+            context.commandResult.modeSwitch = EditorMode::Insert;
+            context.commandResult.flags = ZSetFlags(context.commandResult.flags, CommandResultFlags::BeginUndoGroup, shouldGroupInserts);
+        }
     }
     else if (mappedCommand == id_OpenLineAbove)
     {
@@ -1909,25 +2123,69 @@ bool ZepMode::GetCommand(CommandContext& context)
     // Setup command, if any
     if (context.op == CommandOperation::Delete || context.op == CommandOperation::DeleteLines)
     {
-        auto cmd = std::make_shared<ZepCommand_DeleteRange>(
-            context.buffer,
-            context.beginRange,
-            context.endRange,
-            context.bufferCursor,
-            context.cursorAfterOverride);
-        context.commandResult.spCommand = std::static_pointer_cast<ZepCommand>(cmd);
+        // Check if in multi-cursor mode
+        auto pWindow = GetCurrentWindow();
+        if (pWindow && pWindow->IsMultiCursorMode() && !pWindow->GetAllCursors().empty())
+        {
+            // Collect all ranges for deletion
+            std::vector<std::pair<GlyphIterator, GlyphIterator>> allRanges;
+            allRanges.push_back(std::make_pair(context.beginRange, context.endRange));
+            const auto& selections = pWindow->GetAllSelections();
+            for (const auto& sel : selections)
+            {
+                allRanges.push_back(std::make_pair(sel.first, sel.second));
+            }
+
+            auto cmd = std::make_shared<ZepCommand_MultiCursorDelete>(
+                context.buffer,
+                allRanges);
+            context.commandResult.spCommand = std::static_pointer_cast<ZepCommand>(cmd);
+            return true;
+        }
+        else
+        {
+            auto cmd = std::make_shared<ZepCommand_DeleteRange>(
+                context.buffer,
+                context.beginRange,
+                context.endRange,
+                context.bufferCursor,
+                context.cursorAfterOverride);
+            context.commandResult.spCommand = std::static_pointer_cast<ZepCommand>(cmd);
+        }
         context.commandResult.flags = ZSetFlags(context.commandResult.flags, CommandResultFlags::BeginUndoGroup);
         return true;
     }
     else if (context.op == CommandOperation::Insert && !context.pRegister->text.empty())
     {
-        auto cmd = std::make_shared<ZepCommand_Insert>(
-            context.buffer,
-            context.beginRange,
-            context.pRegister->text,
-            context.bufferCursor,
-            context.cursorAfterOverride);
-        context.commandResult.spCommand = std::static_pointer_cast<ZepCommand>(cmd);
+        // Check if in multi-cursor mode
+        auto pWindow = GetCurrentWindow();
+        if (pWindow && pWindow->IsMultiCursorMode() && !pWindow->GetAllCursors().empty())
+        {
+            // Collect all cursor positions
+            std::vector<GlyphIterator> allCursors;
+            allCursors.push_back(context.bufferCursor);
+            for (const auto& c : pWindow->GetAllCursors())
+            {
+                allCursors.push_back(c);
+            }
+
+            auto cmd = std::make_shared<ZepCommand_MultiCursorInsert>(
+                context.buffer,
+                allCursors,
+                context.pRegister->text);
+            context.commandResult.spCommand = std::static_pointer_cast<ZepCommand>(cmd);
+            return true;
+        }
+        else
+        {
+            auto cmd = std::make_shared<ZepCommand_Insert>(
+                context.buffer,
+                context.beginRange,
+                context.pRegister->text,
+                context.bufferCursor,
+                context.cursorAfterOverride);
+            context.commandResult.spCommand = std::static_pointer_cast<ZepCommand>(cmd);
+        }
         return true;
     }
     else if (context.op == CommandOperation::Replace && !context.pRegister->text.empty())
@@ -2155,9 +2413,17 @@ bool ZepMode::HandleExCommand(std::string strCommand)
             return true;
         }
 
-        auto pCommand = GetEditor().FindExCommand(strCommand.substr(1));
+        // Extract command name (first word after the colon)
+        std::string commandKey = strCommand.substr(1);
+        size_t spacePos = commandKey.find(' ');
+        if (spacePos != std::string::npos)
+        {
+            commandKey = commandKey.substr(0, spacePos);
+        }
+        auto pCommand = GetEditor().FindExCommand(commandKey);
         if (pCommand)
         {
+            // Pass the full command string split into tokens (first token is the command itself)
             auto strTok = string_split(strCommand, " ");
             pCommand->Run(strTok);
         }
@@ -2241,6 +2507,21 @@ bool ZepMode::HandleExCommand(std::string strCommand)
             {
                 pTab->AddWindow(&GetCurrentWindow()->GetBuffer(), GetCurrentWindow(), RegionLayoutType::HBox);
             }
+        }
+        else if (strCommand.find(":set autoindent") != std::string::npos || strCommand.find(":set noautoindent") != std::string::npos)
+        {
+            bool turnOn = (strCommand.find(":set autoindent") != std::string::npos);
+            auto flags = GetEditor().GetFlags();
+            if (turnOn)
+            {
+                flags = ZSetFlags(flags, ZepEditorFlags::AutoIndent);
+            }
+            else
+            {
+                flags = ZClearFlags(flags, ZepEditorFlags::AutoIndent);
+            }
+            GetEditor().SetFlags(flags);
+            GetEditor().SetCommandText(turnOn ? "autoindent on" : "autoindent off");
         }
         else if (strCommand.find(":hsplit") == 0 || strCommand.find(":split") == 0)
         {

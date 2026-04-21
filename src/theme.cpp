@@ -1,6 +1,6 @@
+#include "zep/theme.h"
 #include "zep/editor.h"
 #include "zep/syntax.h"
-#include "zep/theme.h"
 
 namespace Zep
 {
@@ -23,13 +23,13 @@ void ZepTheme::SetThemeType(ThemeType type)
     m_currentTheme = type;
     switch (type)
     {
-        default:
-        case ThemeType::Dark:
-            SetDarkTheme();
-            break;
-        case ThemeType::Light:
-            SetLightTheme();
-            break;
+    default:
+    case ThemeType::Dark:
+        SetDarkTheme();
+        break;
+    case ThemeType::Light:
+        SetLightTheme();
+        break;
     }
 }
 
@@ -69,6 +69,14 @@ void ZepTheme::SetDarkTheme()
     m_colors[ThemeColor::Whitespace] = NVec4f(0.3f, .3f, .3f, 1.0f);
     m_colors[ThemeColor::WidgetBackground] = NVec4f(.2f, .2f, .2f, 1.0f);
     m_colors[ThemeColor::WidgetBorder] = NVec4f(.5f, .5f, .5f, 1.0f);
+    m_colors[ThemeColor::Folded] = NVec4f(0.5f, 0.5f, 0.5f, 1.0f);
+    m_colors[ThemeColor::MinimapBackground] = NVec4f(0.08f, 0.08f, 0.08f, 1.0f);
+    m_colors[ThemeColor::MinimapViewport] = NVec4f(0.3f, 0.3f, 0.35f, 0.5f);
+    m_colors[ThemeColor::GitAdded] = NVec4f(0.0f, 0.5f, 0.0f, 0.3f);
+    m_colors[ThemeColor::GitModified] = NVec4f(0.5f, 0.5f, 0.0f, 0.3f);
+    m_colors[ThemeColor::GitDeleted] = NVec4f(0.5f, 0.0f, 0.0f, 0.3f);
+    m_colors[ThemeColor::GitRenamed] = NVec4f(0.0f, 0.0f, 0.5f, 0.3f);
+    m_colors[ThemeColor::GitUntracked] = NVec4f(0.5f, 0.3f, 0.0f, 0.3f);
 
     m_colors[ThemeColor::LineNumberBackground] = m_colors[ThemeColor::Background] + NVec4f(.02f, .02f, .02f, 0.0f);
     m_colors[ThemeColor::Normal] = m_colors[ThemeColor::Text];
@@ -108,7 +116,15 @@ void ZepTheme::SetLightTheme()
     m_colors[ThemeColor::Whitespace] = NVec4f(0.2f, .2f, .2f, 1.0f);
     m_colors[ThemeColor::WidgetBackground] = NVec4f(.8f, .8f, .8f, 1.0f);
     m_colors[ThemeColor::WidgetBorder] = NVec4f(.5f, .5f, .5f, 1.0f);
-    
+    m_colors[ThemeColor::Folded] = NVec4f(0.6f, 0.6f, 0.6f, 1.0f);
+    m_colors[ThemeColor::MinimapBackground] = NVec4f(0.95f, 0.95f, 0.95f, 1.0f);
+    m_colors[ThemeColor::MinimapViewport] = NVec4f(0.7f, 0.7f, 0.72f, 0.5f);
+    m_colors[ThemeColor::GitAdded] = NVec4f(0.0f, 0.6f, 0.0f, 0.2f);
+    m_colors[ThemeColor::GitModified] = NVec4f(0.6f, 0.6f, 0.0f, 0.2f);
+    m_colors[ThemeColor::GitDeleted] = NVec4f(0.6f, 0.0f, 0.0f, 0.2f);
+    m_colors[ThemeColor::GitRenamed] = NVec4f(0.0f, 0.0f, 0.6f, 0.2f);
+    m_colors[ThemeColor::GitUntracked] = NVec4f(0.6f, 0.4f, 0.0f, 0.2f);
+
     m_colors[ThemeColor::LineNumberBackground] = m_colors[ThemeColor::Background] - NVec4f(.02f, .02f, .02f, 0.0f);
     m_colors[ThemeColor::Normal] = m_colors[ThemeColor::Text];
     m_colors[ThemeColor::Parenthesis] = m_colors[ThemeColor::Text];
@@ -130,7 +146,7 @@ const NVec4f& ZepTheme::GetColor(ThemeColor themeColor) const
 {
     if (themeColor >= ThemeColor::UniqueColor0)
     {
-        // Return the unique color 
+        // Return the unique color
         return m_uniqueColors[((uint32_t)themeColor - (uint32_t)ThemeColor::UniqueColor0) % (uint32_t)ThemeColor::UniqueColorLast];
     }
 

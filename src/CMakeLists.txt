@@ -24,6 +24,7 @@ ${ZEP_ROOT}/include/zep/mode_standard.h
 ${ZEP_ROOT}/include/zep/mode_tree.h
 ${ZEP_ROOT}/include/zep/mode_vim.h
 ${ZEP_ROOT}/include/zep/mode_repl.h
+${ZEP_ROOT}/include/zep/mode_terminal.h
 ${ZEP_ROOT}/include/zep/regress.h
 ${ZEP_ROOT}/include/zep/scroller.h
 ${ZEP_ROOT}/include/zep/splits.h
@@ -35,6 +36,8 @@ ${ZEP_ROOT}/include/zep/syntax_markdown.h
 ${ZEP_ROOT}/include/zep/tab_window.h
 ${ZEP_ROOT}/include/zep/theme.h
 ${ZEP_ROOT}/include/zep/window.h
+${ZEP_ROOT}/include/zep/git.h
+${ZEP_ROOT}/include/zep/terminal.h
 ${ZEP_ROOT}/src/CMakeLists.txt
 ${ZEP_ROOT}/src/buffer.cpp
 ${ZEP_ROOT}/src/range_markers.cpp
@@ -43,6 +46,7 @@ ${ZEP_ROOT}/src/commands.cpp
 ${ZEP_ROOT}/src/display.cpp
 ${ZEP_ROOT}/src/editor.cpp
 ${ZEP_ROOT}/src/filesystem.cpp
+ #${ZEP_ROOT}/src/git.cpp  // temporarily disabled due to API mismatches
 ${ZEP_ROOT}/src/indexer.cpp
 ${ZEP_ROOT}/src/keymap.cpp
 ${ZEP_ROOT}/src/line_widgets.cpp
@@ -55,6 +59,7 @@ ${ZEP_ROOT}/src/mode_standard.cpp
 ${ZEP_ROOT}/src/mode_tree.cpp
 ${ZEP_ROOT}/src/mode_vim.cpp
 ${ZEP_ROOT}/src/mode_repl.cpp
+${ZEP_ROOT}/src/mode_terminal.cpp
 ${ZEP_ROOT}/src/regress.cpp
 ${ZEP_ROOT}/src/scroller.cpp
 ${ZEP_ROOT}/src/splits.cpp
@@ -66,6 +71,8 @@ ${ZEP_ROOT}/src/syntax_markdown.cpp
 ${ZEP_ROOT}/src/tab_window.cpp
 ${ZEP_ROOT}/src/theme.cpp
 ${ZEP_ROOT}/src/window.cpp
+${ZEP_ROOT}/src/commands_terminal.cpp
+${ZEP_ROOT}/src/terminal.cpp
 )
 
 set(SOURCES ${ZEP_SOURCE})
@@ -73,19 +80,28 @@ set(SOURCES ${ZEP_SOURCE})
 LIST(APPEND SRC_INCLUDE ${ZEP_ROOT}/src ${ZEP_ROOT}/src/mcommon)
 
 # Create the library - No depenencies on anything else in this file
-add_library(Zep STATIC ${SOURCES})
-add_library(Zep::Zep ALIAS Zep)
+ add_library(Zep STATIC ${SOURCES})
+ add_library(Zep::Zep ALIAS Zep)
 
-target_include_directories(Zep 
-    PRIVATE
-        ${ZEP_ROOT}/src/mcommon
-        ${ZEP_ROOT}/src
-        ${SRC_INCLUDE}
-        ${CMAKE_BINARY_DIR}
-        ${ZEP_ROOT}/include
-    PUBLIC
-        $<INSTALL_INTERFACE:include>
-    ) 
+ # Ensure architecture macro is defined for Windows headers
+ if(MSVC)
+     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+         target_compile_definitions(Zep PRIVATE _AMD64_)
+     else()
+         target_compile_definitions(Zep PRIVATE _X86_)
+     endif()
+ endif()
+
+ target_include_directories(Zep 
+     PRIVATE
+         ${ZEP_ROOT}/src/mcommon
+         ${ZEP_ROOT}/src
+         ${SRC_INCLUDE}
+         ${CMAKE_BINARY_DIR}
+         ${ZEP_ROOT}/include
+     PUBLIC
+         $<INSTALL_INTERFACE:include>
+     ) 
 
 if (TARGET_LINUX)
 target_link_libraries(Zep

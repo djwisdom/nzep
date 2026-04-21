@@ -47,6 +47,15 @@ enum class ThemeColor
     WidgetInactive,
     FlashColor,
     Custom,
+    Folded,
+    MinimapBackground,
+    MinimapViewport,
+
+    GitAdded,
+    GitModified,
+    GitDeleted,
+    GitRenamed,
+    GitUntracked,
 
     // Last in the list!
     // A set of pregenerated, easy to differentiate unique colors

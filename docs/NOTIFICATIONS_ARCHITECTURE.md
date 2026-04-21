@@ -1,4 +1,4 @@
-# Zep Notifications - Design Architecture
+# nZep Notifications - Design Architecture
 ## Under the Hood
 
 *How it all works. For the curious and the contributors.*

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+#include <limits>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -7,8 +9,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <limits>
-#include <filesystem>
 
 #include "zep_config.h"
 
@@ -56,6 +56,7 @@ class ZepTheme;
 class ZepDisplay;
 class IZepFileSystem;
 class Indexer;
+class ZepGit;
 
 struct Region;
 
@@ -86,7 +87,8 @@ enum
 {
     None = (0),
     DisableThreads = (1 << 0),
-    FastUpdate = (1 << 1)
+    FastUpdate = (1 << 1),
+    AutoIndent = (1 << 2)
 };
 };
 
@@ -257,6 +259,8 @@ struct EditorConfig
     bool searchGitRoot = true;
     float backgroundFadeTime = 60.0f;
     float backgroundFadeWait = 60.0f;
+    bool showMinimap = false;
+    float minimapWidth = 100.0f;
 };
 
 class ZepExCommand : public ZepComponent
@@ -273,7 +277,7 @@ public:
     {
         return StringId(ExCommandName());
     }
-    virtual void Init(){};
+    virtual void Init() {};
     virtual const KeyMap* GetKeyMappings(ZepMode&) const
     {
         return nullptr;
@@ -452,6 +456,11 @@ private:
 public:
     bool isFocused = true;
 
+    std::shared_ptr<ZepGit> GetGit() const
+    {
+        return m_spGit;
+    }
+
 private:
     ZepDisplay* m_pDisplay;
     IZepFileSystem* m_pFileSystem;
@@ -505,6 +514,7 @@ private:
     std::unique_ptr<ThreadPool> m_threadPool;
 
     std::shared_ptr<Indexer> m_indexer;
+    std::shared_ptr<ZepGit> m_spGit;
 };
 
 } // namespace Zep

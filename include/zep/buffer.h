@@ -11,6 +11,7 @@
 #include "zep/glyph_iterator.h"
 
 #include "zep/editor.h"
+#include "zep/fold.h"
 #include "zep/line_widgets.h"
 #include "zep/range_markers.h"
 
@@ -74,7 +75,8 @@ enum class BufferType
     Search,
     Repl,
     DataGrid,
-    Tree
+    Tree,
+    Terminal
 };
 
 // A really big cursor move; which will likely clamp
@@ -269,6 +271,8 @@ public:
 
     GlyphRange GetExpression(ExpressionType type, const GlyphIterator location, const std::vector<char>& beginExpression, const std::vector<char>& endExpression) const;
     std::string GetBufferText(const GlyphIterator& start, const GlyphIterator& end) const;
+    std::string GetLineIndentation(GlyphIterator location) const;
+    std::string GetPrevLineIndentation(GlyphIterator location) const;
 
     void SetPostKeyNotifier(fnKeyNotifier notifier);
     fnKeyNotifier GetPostKeyNotifier() const;
@@ -279,12 +283,25 @@ public:
     uint64_t ToHandle() const;
     static ZepBuffer* FromHandle(ZepEditor& editor, uint64_t handle);
 
+    ZepFold& GetFold()
+    {
+        return m_fold;
+    }
+
+    const ZepFold& GetFold() const
+    {
+        return m_fold;
+    }
+
+    long GetVisibleLineCount() const;
+    long BufferToVisibleLine(long bufferLine) const;
+    long VisibleToBufferLine(long visibleLine) const;
+
     Zep::signal<void(ZepBuffer& buffer, const GlyphIterator&, const std::string&)> sigPreInsert;
     Zep::signal<void(ZepBuffer& buffer, const GlyphIterator&, const GlyphIterator&)> sigPreDelete;
 
     std::stack<std::shared_ptr<ZepCommand>>& GetUndoStack();
     std::stack<std::shared_ptr<ZepCommand>>& GetRedoStack();
-
 
 private:
     void MarkUpdate();
@@ -317,9 +334,11 @@ private:
     // Modes
     std::shared_ptr<ZepMode> m_spMode;
     fnKeyNotifier m_postKeyNotifier;
-    
+
     std::stack<std::shared_ptr<ZepCommand>> m_undoStack;
     std::stack<std::shared_ptr<ZepCommand>> m_redoStack;
+
+    ZepFold m_fold;
 };
 
 // Notification payload

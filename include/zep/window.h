@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <vector>
+
 #include "buffer.h"
 
 namespace Zep
@@ -87,7 +89,8 @@ enum
     Modal = (1 << 5),
     WrapText = (1 << 6), // Warning: this is not for general use yet. Has issues
     HideSplitMark = (1 << 7),
-    GridStyle = (1 << 8)
+    GridStyle = (1 << 8),
+    HideMinimap = (1 << 9)
 };
 }
 
@@ -192,6 +195,7 @@ private:
     void DisplayGridMarkers();
     void DisplayMarkerHints();
     void DisplayLineNumbers();
+    void DisplayMinimap();
 
     void DisableToolTipTillMove();
 
@@ -217,6 +221,7 @@ private:
     std::shared_ptr<Region> m_numberRegion; // Numbers
     std::shared_ptr<Region> m_indicatorRegion; // Indicators (between numbers and text)
     std::shared_ptr<Region> m_vScrollRegion; // Vertical scroller
+    std::shared_ptr<Region> m_minimapRegion; // Minimap
     std::shared_ptr<Region> m_expandingEditRegion; // Region containing the text sub-box
     Airline m_airline;
 
@@ -241,6 +246,30 @@ private:
     // Cursor
     GlyphIterator m_bufferCursor; // Location in buffer coordinates.  Each window has a different buffer cursor
     long m_lastCursorColumn = 0; // The last cursor column (could be removed and recalculated)
+
+    // Multiple cursor support
+    std::vector<GlyphIterator> m_multipleCursors; // Additional cursor positions
+    std::vector<GlyphRange> m_multipleSelections; // Selections for each cursor (start, end)
+    bool m_multiCursorMode = false; // Whether multi-cursor mode is active
+
+public:
+    // Helper to get all cursors
+    const std::vector<GlyphIterator>& GetAllCursors() const;
+    // Helper to get all selections
+    const std::vector<GlyphRange>& GetAllSelections() const;
+    // Add a cursor at position
+    void AddCursorAt(GlyphIterator pos);
+    // Remove a cursor at position
+    void RemoveCursorAt(GlyphIterator pos);
+    // Check if position has a cursor
+    bool HasCursorAt(GlyphIterator pos) const;
+    // Clear all extra cursors
+    void ClearCursors();
+    // Set multi-cursor mode
+    void SetMultiCursorMode(bool enable);
+    bool IsMultiCursorMode() const;
+
+private:
     NVec2f m_mousePos; // Current mouse location
     GlyphIterator m_mouseIterator; // Current iterator for the mouse cursor
 
@@ -265,6 +294,10 @@ private:
     std::map<NVec2f, std::shared_ptr<RangeMarker>> m_toolTips; // All tooltips for a given position, currently only 1 at a time
 
     NVec2f lastLinePx;
+
+    bool m_minimapDragging = false;
+    NVec2f m_minimapDragStart;
+    float m_minimapScrollStart;
 };
 
 } // namespace Zep

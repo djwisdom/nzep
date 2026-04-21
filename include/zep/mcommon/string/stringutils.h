@@ -1,12 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <cstdint>
 
 namespace Zep
 {
@@ -166,6 +166,92 @@ inline bool utf8_is_trailing(uint8_t ch)
 inline long utf8_codepoint_length(uint8_t ch)
 {
     return ((0xE5000000 >> ((ch >> 3) & 0x1e)) & 3) + 1;
+}
+
+inline long utf8_strlen(const std::string& str)
+{
+    long count = 0;
+    for (auto itr = str.begin(); itr != str.end(); ++itr)
+    {
+        itr += utf8_codepoint_length(static_cast<uint8_t>(*itr)) - 1;
+        count++;
+    }
+    return count;
+}
+
+inline std::string utf8_next_codepoint(const std::string& str, std::string::const_iterator& itr)
+{
+    if (itr >= str.end())
+    {
+        return std::string();
+    }
+    auto len = utf8_codepoint_length(static_cast<uint8_t>(*itr));
+    std::string result(itr, itr + len);
+    itr += len;
+    return result;
+}
+
+inline std::string utf8_substr(const std::string& str, long start, long length = -1)
+{
+    if (str.empty())
+    {
+        return std::string();
+    }
+
+    std::string result;
+    auto itr = str.begin();
+    long pos = 0;
+    long count = 0;
+
+    while (itr < str.end())
+    {
+        if (pos >= start && (length < 0 || count < length))
+        {
+            auto len = utf8_codepoint_length(static_cast<uint8_t>(*itr));
+            result.append(itr, itr + len);
+            itr += len;
+            count++;
+            if (length >= 0 && count >= length)
+            {
+                break;
+            }
+        }
+        else
+        {
+            itr += utf8_codepoint_length(static_cast<uint8_t>(*itr));
+        }
+        pos++;
+    }
+
+    return result;
+}
+
+inline std::string utf8_from_codepoint(uint32_t codepoint)
+{
+    std::string result;
+    if (codepoint < 0x80)
+    {
+        result.push_back(static_cast<char>(codepoint));
+    }
+    else if (codepoint < 0x800)
+    {
+        result.push_back(static_cast<char>(0xC0 | ((codepoint >> 6) & 0x1F)));
+        result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    }
+    else if (codepoint < 0x10000)
+    {
+        result.push_back(static_cast<char>(0xE0 | ((codepoint >> 12) & 0x0F)));
+        result.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    }
+    else
+    {
+        result.push_back(static_cast<char>(0xF0 | ((codepoint >> 18) & 0x07)));
+        result.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+        result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+    }
+    return result;
 }
 
 } // namespace Zep

@@ -45,8 +45,8 @@ public:
         : ZepCommand(currentMode)
     {
     }
-    virtual void Redo() override{};
-    virtual void Undo() override{};
+    virtual void Redo() override {};
+    virtual void Undo() override {};
 };
 
 class ZepCommand_EndGroup : public ZepCommand
@@ -56,15 +56,15 @@ public:
         : ZepCommand(currentMode)
     {
     }
-    virtual void Redo() override{};
-    virtual void Undo() override{};
+    virtual void Redo() override {};
+    virtual void Undo() override {};
 };
 
 class ZepCommand_DeleteRange : public ZepCommand
 {
 public:
     ZepCommand_DeleteRange(ZepBuffer& buffer, const GlyphIterator& startIndex, const GlyphIterator& endIndex, const GlyphIterator& cursor = GlyphIterator(), const GlyphIterator& cursorAfter = GlyphIterator());
-    virtual ~ZepCommand_DeleteRange(){};
+    virtual ~ZepCommand_DeleteRange() {};
 
     virtual void Redo() override;
     virtual void Undo() override;
@@ -77,7 +77,7 @@ class ZepCommand_ReplaceRange : public ZepCommand
 {
 public:
     ZepCommand_ReplaceRange(ZepBuffer& buffer, ReplaceRangeMode replaceMode, const GlyphIterator& startIndex, const GlyphIterator& endIndex, const std::string& ch, const GlyphIterator& cursor = GlyphIterator(), const GlyphIterator& cursorAfter = GlyphIterator());
-    virtual ~ZepCommand_ReplaceRange(){};
+    virtual ~ZepCommand_ReplaceRange() {};
 
     virtual void Redo() override;
     virtual void Undo() override;
@@ -94,7 +94,7 @@ class ZepCommand_Insert : public ZepCommand
 {
 public:
     ZepCommand_Insert(ZepBuffer& buffer, const GlyphIterator& startIndex, const std::string& str, const GlyphIterator& cursor = GlyphIterator(), const GlyphIterator& cursorAfter = GlyphIterator());
-    virtual ~ZepCommand_Insert(){};
+    virtual ~ZepCommand_Insert() {};
 
     virtual void Redo() override;
     virtual void Undo() override;
@@ -102,6 +102,33 @@ public:
     GlyphIterator m_startIndex;
     std::string m_strInsert;
     GlyphIterator m_endIndexInserted;
+};
+
+class ZepCommand_MultiCursorInsert : public ZepCommand
+{
+public:
+    ZepCommand_MultiCursorInsert(ZepBuffer& buffer, const std::vector<GlyphIterator>& cursorPositions, const std::string& str);
+    virtual ~ZepCommand_MultiCursorInsert() {};
+
+    virtual void Redo() override;
+    virtual void Undo() override;
+
+    std::vector<GlyphIterator> m_cursorPositions;
+    std::string m_strInsert;
+    std::vector<GlyphIterator> m_endPositions;
+};
+
+class ZepCommand_MultiCursorDelete : public ZepCommand
+{
+public:
+    ZepCommand_MultiCursorDelete(ZepBuffer& buffer, const std::vector<std::pair<GlyphIterator, GlyphIterator>>& ranges);
+    virtual ~ZepCommand_MultiCursorDelete() {};
+
+    virtual void Redo() override;
+    virtual void Undo() override;
+
+    std::vector<std::pair<GlyphIterator, GlyphIterator>> m_ranges;
+    std::vector<std::string> m_deletedTexts;
 };
 
 } // namespace Zep

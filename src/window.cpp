@@ -32,6 +32,18 @@ struct WindowPass
 namespace Zep
 {
 
+bool IsAnyCursor(const GlyphIterator& itr, const GlyphIterator& mainCursor, const std::vector<GlyphIterator>& additionalCursors)
+{
+    if (itr == mainCursor)
+        return true;
+    for (const auto& c : additionalCursors)
+    {
+        if (itr == c)
+            return true;
+    }
+    return false;
+}
+
 const float ScrollBarSize = 17.0f;
 const float UnderlineMargin = 1.0f;
 
@@ -46,6 +58,7 @@ ZepWindow::ZepWindow(ZepTabWindow& window, ZepBuffer* buffer)
     m_textRegion = std::make_shared<Region>();
     m_airlineRegion = std::make_shared<Region>();
     m_vScrollRegion = std::make_shared<Region>();
+    m_minimapRegion = std::make_shared<Region>();
 
     m_bufferRegion->flags = RegionFlags::Expanding;
     m_bufferRegion->layoutType = RegionLayoutType::VBox;
@@ -53,6 +66,7 @@ ZepWindow::ZepWindow(ZepTabWindow& window, ZepBuffer* buffer)
     m_numberRegion->flags = RegionFlags::Fixed;
     m_indicatorRegion->flags = RegionFlags::Fixed;
     m_vScrollRegion->flags = RegionFlags::Fixed;
+    m_minimapRegion->flags = RegionFlags::Fixed;
     m_textRegion->flags = RegionFlags::Expanding;
     m_airlineRegion->flags = RegionFlags::Fixed;
 
@@ -74,6 +88,7 @@ ZepWindow::ZepWindow(ZepTabWindow& window, ZepBuffer* buffer)
     m_editRegion->children.push_back(m_indicatorRegion);
     m_editRegion->children.push_back(m_textRegion);
     m_editRegion->children.push_back(m_vScrollRegion);
+    m_editRegion->children.push_back(m_minimapRegion);
 
     m_bufferRegion->children.push_back(m_airlineRegion);
 
@@ -215,6 +230,19 @@ void ZepWindow::Notify(std::shared_ptr<ZepMessage> payload)
     else if (payload->messageId == Msg::MouseMove)
     {
         m_mousePos = payload->pos;
+
+        if (m_minimapDragging && m_textSizePx.y > 0)
+        {
+            float minimapHeight = m_minimapRegion->rect.Height();
+            float dragDelta = m_mousePos.y - m_minimapDragStart.y;
+            float scrollDelta = (dragDelta / minimapHeight) * m_textSizePx.y;
+            m_textOffsetPx = std::max(0.0f, std::min(m_textSizePx.y - m_textRegion->rect.Height(), m_minimapScrollStart + scrollDelta));
+
+            m_vScroller->vScrollPosition = m_textOffsetPx / m_textSizePx.y;
+            UpdateVisibleLineRange();
+            DisableToolTipTillMove();
+        }
+
         if (!m_toolTips.empty())
         {
             if (ManhattanDistance(m_mouseHoverPos, payload->pos) > 4.0f)
@@ -242,9 +270,51 @@ void ZepWindow::Notify(std::shared_ptr<ZepMessage> payload)
         {
             SetBufferCursor(m_mouseIterator);
         }
+
+        if (m_minimapRegion->rect.Contains(m_mousePos))
+        {
+            if (m_textSizePx.y > 0)
+            {
+                float minimapHeight = m_minimapRegion->rect.Height();
+                float clickY = (m_mousePos.y - m_minimapRegion->rect.Top()) / minimapHeight;
+                float targetOffset = clickY * m_textSizePx.y - (m_textRegion->rect.Height() / 2.0f);
+                m_textOffsetPx = std::max(0.0f, std::min(m_textSizePx.y - m_textRegion->rect.Height(), targetOffset));
+
+                m_vScroller->vScrollPosition = m_textOffsetPx / m_textSizePx.y;
+                UpdateVisibleLineRange();
+                DisableToolTipTillMove();
+            }
+        }
+
+        if (payload->button == ZepMouseButton::Left && !m_minimapDragging && m_minimapRegion->rect.Contains(m_mousePos))
+        {
+            m_minimapDragging = true;
+            m_minimapDragStart = m_mousePos;
+            m_minimapScrollStart = m_textOffsetPx;
+        }
+    }
+    else if (payload->messageId == Msg::MouseUp)
+    {
+        m_minimapDragging = false;
     }
     else if (payload->messageId == Msg::MouseWheel)
     {
+        if (m_minimapRegion->rect.Contains(m_mousePos))
+        {
+            if (m_textSizePx.y > 0)
+            {
+                float wheelDelta = 0.0f;
+                if (payload->str == "up")
+                    wheelDelta = -3.0f * GetEditor().GetDisplay().GetFont(ZepTextType::Text).GetPixelHeight();
+                else if (payload->str == "down")
+                    wheelDelta = 3.0f * GetEditor().GetDisplay().GetFont(ZepTextType::Text).GetPixelHeight();
+
+                m_textOffsetPx = std::max(0.0f, std::min(m_textSizePx.y - m_textRegion->rect.Height(), m_textOffsetPx + wheelDelta));
+                m_vScroller->vScrollPosition = m_textOffsetPx / m_textSizePx.y;
+                UpdateVisibleLineRange();
+                DisableToolTipTillMove();
+            }
+        }
         /* TBD: From PR #106: this does not work correctly: It scrolls the text off the page
         * completely at the bottom
         m_textOffsetPx = std::min(m_textSizePx.y, std::max(0.0f, m_textOffsetPx - 5 * stof(payload->str) * GetEditor().GetDisplay().GetFont(ZepTextType::Text).GetPixelHeight()));
@@ -1181,7 +1251,7 @@ bool ZepWindow::DisplayLine(SpanInfo& lineInfo, int displayPass)
             }
 
             // If active window and this is the cursor char then display the marker as a priority over what we would have shown
-            if (IsActiveWindow() && (cp.iterator == m_bufferCursor) && (!cursorBlink || cursorType == CursorType::LineMarker))
+            if (IsActiveWindow() && IsAnyCursor(cp.iterator, m_bufferCursor, m_multipleCursors) && (!cursorBlink || cursorType == CursorType::LineMarker))
             {
                 switch (cursorType)
                 {
@@ -1268,7 +1338,7 @@ bool ZepWindow::DisplayLine(SpanInfo& lineInfo, int displayPass)
 
                 // If this is the cursor char we override the colors
                 auto ws = whiteSpaceCol;
-                if (IsActiveWindow() && (cp.iterator == m_bufferCursor) && !cursorBlink && cursorType == CursorType::Normal)
+                if (IsActiveWindow() && IsAnyCursor(cp.iterator, m_bufferCursor, m_multipleCursors) && !cursorBlink && cursorType == CursorType::Normal)
                 {
                     col = m_pBuffer->GetTheme().GetComplement(m_pBuffer->GetTheme().GetColor(ThemeColor::CursorNormal));
                     ws = col;
@@ -1413,6 +1483,84 @@ GlyphIterator ZepWindow::GetBufferCursor()
     return m_bufferCursor;
 }
 
+const std::vector<GlyphIterator>& ZepWindow::GetAllCursors() const
+{
+    return m_multipleCursors;
+}
+
+const std::vector<GlyphRange>& ZepWindow::GetAllSelections() const
+{
+    return m_multipleSelections;
+}
+
+void ZepWindow::AddCursorAt(GlyphIterator pos)
+{
+    if (!pos.Valid())
+        return;
+
+    // Check if cursor already exists at this position
+    for (const auto& cursor : m_multipleCursors)
+    {
+        if (cursor == pos)
+            return;
+    }
+
+    m_multipleCursors.push_back(pos);
+    m_multipleSelections.push_back({ pos, pos });
+    m_multiCursorMode = true;
+    m_cursorMoved = true;
+}
+
+void ZepWindow::RemoveCursorAt(GlyphIterator pos)
+{
+    for (size_t i = 0; i < m_multipleCursors.size(); i++)
+    {
+        if (m_multipleCursors[i] == pos)
+        {
+            m_multipleCursors.erase(m_multipleCursors.begin() + i);
+            m_multipleSelections.erase(m_multipleSelections.begin() + i);
+            if (m_multipleCursors.empty())
+            {
+                m_multiCursorMode = false;
+            }
+            m_cursorMoved = true;
+            return;
+        }
+    }
+}
+
+bool ZepWindow::HasCursorAt(GlyphIterator pos) const
+{
+    for (const auto& cursor : m_multipleCursors)
+    {
+        if (cursor == pos)
+            return true;
+    }
+    return false;
+}
+
+void ZepWindow::ClearCursors()
+{
+    m_multipleCursors.clear();
+    m_multipleSelections.clear();
+    m_multiCursorMode = false;
+    m_cursorMoved = true;
+}
+
+void ZepWindow::SetMultiCursorMode(bool enable)
+{
+    if (!enable)
+    {
+        ClearCursors();
+    }
+    m_multiCursorMode = enable;
+}
+
+bool ZepWindow::IsMultiCursorMode() const
+{
+    return m_multiCursorMode;
+}
+
 ZepBuffer& ZepWindow::GetBuffer() const
 {
     return *m_pBuffer;
@@ -1442,6 +1590,109 @@ void ZepWindow::DisplayScrollers()
     GetEditor().GetDisplay().SetClipRect(m_bufferRegion->rect);
 }
 
+void ZepWindow::DisplayMinimap()
+{
+    if (m_minimapRegion->rect.Empty())
+        return;
+
+    auto& display = GetEditor().GetDisplay();
+    auto& theme = m_pBuffer->GetTheme();
+    auto& font = display.GetFont(ZepTextType::Text);
+
+    display.SetClipRect(m_minimapRegion->rect);
+
+    auto minimapRect = m_minimapRegion->rect;
+    auto minimapHeight = minimapRect.Height();
+    auto minimapWidth = minimapRect.Width();
+
+    if (m_textSizePx.y <= 0)
+        return;
+
+    float scale = minimapHeight / m_textSizePx.y;
+    float lineHeightMinimap = font.GetPixelHeight() * scale;
+
+    const auto& textBuffer = m_pBuffer->GetWorkingBuffer();
+    auto pSyntax = m_pBuffer->GetSyntax();
+
+    display.DrawRectFilled(minimapRect, ModifyBackgroundColor(ThemeColor::MinimapBackground));
+
+    float yPos = minimapRect.topLeftPx.y;
+    float viewportTop = 0.0f;
+    float viewportBottom = 0.0f;
+
+    if (m_textSizePx.y > minimapHeight)
+    {
+        viewportTop = (m_textOffsetPx / m_textSizePx.y) * minimapHeight;
+        viewportBottom = ((m_textOffsetPx + m_textRegion->rect.Height()) / m_textSizePx.y) * minimapHeight;
+    }
+    else
+    {
+        viewportTop = 0.0f;
+        viewportBottom = minimapHeight;
+    }
+
+    NVec4f viewportColor = theme.GetColor(ThemeColor::MinimapViewport);
+    NRectf viewportRect(minimapRect.topLeftPx + NVec2f(0.0f, viewportTop),
+        minimapRect.topLeftPx + NVec2f(minimapWidth, viewportBottom));
+    viewportRect.Adjust(1.0f, 0.0f, -1.0f, 0.0f);
+    display.DrawRectFilled(viewportRect, viewportColor);
+
+    float xMargin = DPI_X(2.0f);
+
+    for (long bufferLine = 0; bufferLine < m_pBuffer->GetLineCount(); bufferLine++)
+    {
+        ByteRange lineByteRange;
+        if (!m_pBuffer->GetLineOffsets(bufferLine, lineByteRange))
+            break;
+
+        float lineY = (float(bufferLine) * m_defaultLineSize / m_textSizePx.y) * minimapHeight;
+        if (lineY > minimapHeight)
+            break;
+
+        float endLineY = ((float(bufferLine) + 1.0f) * m_defaultLineSize / m_textSizePx.y) * minimapHeight;
+
+        float screenX = minimapRect.Left() + xMargin;
+        float maxWidth = minimapWidth - xMargin * 2.0f;
+
+        for (auto ch = lineByteRange.first; ch < lineByteRange.second && screenX < (minimapRect.Right() - xMargin);)
+        {
+            const uint8_t* pCh = &textBuffer[ch];
+            auto charWidth = font.GetCharSize(pCh).x * scale;
+
+            NVec4f col = theme.GetColor(ThemeColor::Text);
+
+            if (pSyntax)
+            {
+                GlyphIterator itr(m_pBuffer, ch);
+                auto syntaxResult = pSyntax->GetSyntaxAt(itr);
+                if (syntaxResult.foreground != ThemeColor::None)
+                {
+                    col = pSyntax->ToForegroundColor(syntaxResult);
+                }
+            }
+
+            if (*pCh == '\n' || *pCh == 0)
+                break;
+
+            float drawWidth = std::min(charWidth, maxWidth - (screenX - minimapRect.Left() - xMargin));
+            if (drawWidth > 0)
+            {
+                display.DrawRectFilled(
+                    NRectf(screenX, minimapRect.Top() + lineY, drawWidth, lineHeightMinimap),
+                    NVec4f(col.x, col.y, col.z, 0.6f));
+                screenX += charWidth;
+            }
+
+            ch += utf8_codepoint_length(*pCh);
+        }
+    }
+
+    NVec4f borderColor = theme.GetColor(ThemeColor::TabInactive);
+    display.DrawRect(minimapRect, borderColor);
+
+    display.SetClipRect(NRectf{});
+}
+
 void ZepWindow::DirtyLayout()
 {
     m_layoutDirty = true;
@@ -1468,6 +1719,16 @@ void ZepWindow::UpdateLayout(bool force)
         else
         {
             m_indicatorRegion->fixed_size = NVec2f(0.0f);
+        }
+
+        bool showMinimap = GetEditor().GetConfig().showMinimap && !ZTestFlags(GetWindowFlags(), WindowFlags::HideMinimap);
+        if (showMinimap)
+        {
+            m_minimapRegion->fixed_size = NVec2f(GetEditor().GetConfig().minimapWidth * GetEditor().GetDisplay().GetPixelScale().x, 0.0f);
+        }
+        else
+        {
+            m_minimapRegion->fixed_size = NVec2f(0.0f);
         }
 
         // When wrapping text, we fit the text to the available window space
@@ -1741,6 +2002,8 @@ void ZepWindow::Display()
     }
 
     DisplayScrollers();
+
+    DisplayMinimap();
 
     // This is a line down the middle of a split
     if (GetEditor().GetConfig().style == EditorStyle::Normal && !ZTestFlags(GetWindowFlags(), WindowFlags::HideSplitMark))

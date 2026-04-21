@@ -168,9 +168,31 @@ DECLARE_COMMANDID(MotionStandardRightWordSelect)
 
 DECLARE_COMMANDID(InsertCarriageReturn)
 DECLARE_COMMANDID(InsertTab)
+DECLARE_COMMANDID(Dedent)
 
 // Insert Mode
 DECLARE_COMMANDID(Backspace)
+
+// Macro recording and playback
+DECLARE_COMMANDID(MacroRecord)
+DECLARE_COMMANDID(MacroPlay)
+
+// Fold commands
+DECLARE_COMMANDID(FoldCreate)
+DECLARE_COMMANDID(FoldDelete)
+DECLARE_COMMANDID(FoldDeleteAll)
+DECLARE_COMMANDID(FoldOpen)
+DECLARE_COMMANDID(FoldOpenAll)
+DECLARE_COMMANDID(FoldClose)
+DECLARE_COMMANDID(FoldCloseAll)
+DECLARE_COMMANDID(FoldToggle)
+
+// Multi-cursor commands
+DECLARE_COMMANDID(MultiCursorAdd)
+DECLARE_COMMANDID(MultiCursorSkip)
+DECLARE_COMMANDID(MultiCursorSelectAll)
+DECLARE_COMMANDID(MultiCursorMode)
+
 struct CommandNode
 {
     // <D> = digits
