@@ -428,7 +428,7 @@ public:
         }
     }
 
-    std::vector<Notification> GetBySeverity(NotificationSeverity s)
+    std::vector<Notification> GetBySeverity(NotificationSeverity s) const
     {
         std::vector<Notification> result;
         for (const auto& n : notifications)
@@ -439,7 +439,7 @@ public:
         return result;
     }
 
-    std::vector<Notification> GetCritical()
+    std::vector<Notification> GetCritical() const
     {
         return GetBySeverity(NotificationSeverity::Critical);
     }
