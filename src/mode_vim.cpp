@@ -895,6 +895,199 @@ public:
     }
 };
 
+class ZepExCommand_Edit : public ZepExCommand
+{
+public:
+    ZepExCommand_Edit(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "e";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        if (args.size() < 2)
+        {
+            GetEditor().SetCommandText("E471: Argument required");
+            return;
+        }
+
+        fs::path filePath = args[1];
+        auto pBuffer = GetEditor().GetFileBuffer(filePath);
+        if (pBuffer)
+        {
+            GetEditor().EnsureWindow(*pBuffer);
+        }
+    }
+};
+
+class ZepExCommand_BufferNext : public ZepExCommand
+{
+public:
+    ZepExCommand_BufferNext(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "bn";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        auto buffers = GetEditor().GetBuffers();
+        if (buffers.size() <= 1)
+        {
+            GetEditor().SetCommandText("E85: No next buffer");
+            return;
+        }
+
+        auto pCurrentBuffer = GetEditor().GetActiveBuffer();
+        auto itr = std::find_if(buffers.begin(), buffers.end(), [pCurrentBuffer](const std::shared_ptr<ZepBuffer>& buff) {
+            return buff.get() == pCurrentBuffer;
+        });
+
+        if (itr != buffers.end())
+        {
+            ++itr;
+            if (itr == buffers.end())
+                itr = buffers.begin();
+            GetEditor().EnsureWindow(**itr);
+        }
+    }
+};
+
+class ZepExCommand_BufferPrev : public ZepExCommand
+{
+public:
+    ZepExCommand_BufferPrev(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "bp";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        auto buffers = GetEditor().GetBuffers();
+        if (buffers.size() <= 1)
+        {
+            GetEditor().SetCommandText("E85: No previous buffer");
+            return;
+        }
+
+        auto pCurrentBuffer = GetEditor().GetActiveBuffer();
+        auto itr = std::find_if(buffers.begin(), buffers.end(), [pCurrentBuffer](const std::shared_ptr<ZepBuffer>& buff) {
+            return buff.get() == pCurrentBuffer;
+        });
+
+        if (itr != buffers.end())
+        {
+            if (itr == buffers.begin())
+                itr = buffers.end();
+            --itr;
+            GetEditor().EnsureWindow(**itr);
+        }
+    }
+};
+
+class ZepExCommand_BufferGoto : public ZepExCommand
+{
+public:
+    ZepExCommand_BufferGoto(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "b";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        if (args.size() < 2)
+        {
+            GetEditor().SetCommandText("E86: Buffer number or name required");
+            return;
+        }
+
+        auto buffers = GetEditor().GetBuffers();
+        std::string arg = args[1];
+
+        if (std::all_of(arg.begin(), arg.end(), ::isdigit))
+        {
+            int bufNum = std::stoi(arg);
+            if (bufNum < 1 || bufNum > (int)buffers.size())
+            {
+                GetEditor().SetCommandText("E86: Invalid buffer number");
+                return;
+            }
+            GetEditor().EnsureWindow(*buffers[bufNum - 1]);
+        }
+        else
+        {
+            auto itr = std::find_if(buffers.begin(), buffers.end(), [&arg](const std::shared_ptr<ZepBuffer>& buff) {
+                return buff->GetDisplayName().find(arg) != std::string::npos;
+            });
+
+            if (itr != buffers.end())
+            {
+                GetEditor().EnsureWindow(**itr);
+            }
+            else
+            {
+                GetEditor().SetCommandText("E86: No buffer with name: " + arg);
+            }
+        }
+    }
+};
+
+class ZepExCommand_Split : public ZepExCommand
+{
+public:
+    ZepExCommand_Split(ZepEditor& editor)
+        : ZepExCommand(editor)
+    {
+    }
+
+    const char* ExCommandName() const override
+    {
+        return "sp";
+    }
+
+    void Run(const std::vector<std::string>& args) override
+    {
+        auto pTab = GetEditor().GetActiveTabWindow();
+        if (!pTab)
+            return;
+
+        ZepBuffer* pBuffer = nullptr;
+        if (args.size() >= 2)
+        {
+            fs::path filePath = args[1];
+            pBuffer = GetEditor().GetFileBuffer(filePath);
+        }
+        else
+        {
+            pBuffer = GetEditor().GetEmptyBuffer("Untitled");
+        }
+
+        if (pBuffer)
+        {
+            pTab->AddWindow(pBuffer, nullptr, RegionLayoutType::HBox);
+        }
+    }
+};
+
 void RegisterVimExCommands(ZepEditor& editor)
 {
     editor.RegisterExCommand(std::make_shared<ZepExCommand_Substitute>(editor));
@@ -905,18 +1098,22 @@ void RegisterVimExCommands(ZepEditor& editor)
     editor.RegisterExCommand(std::make_shared<ZepExCommand_Ls>(editor));
     editor.RegisterExCommand(std::make_shared<ZepExCommand_Global>(editor));
     editor.RegisterExCommand(std::make_shared<ZepExCommand_Next>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Edit>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_BufferNext>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_BufferPrev>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_BufferGoto>(editor));
+    editor.RegisterExCommand(std::make_shared<ZepExCommand_Split>(editor));
 
-    // Git commands - disabled (requires full git component)
-    // if (auto spGit = editor.GetGit())
-    // {
-    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitStatus>(editor, spGit));
-    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitDiff>(editor, spGit));
-    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_VGitDiff>(editor, spGit));
-    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitBlame>(editor, spGit));
-    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitCommit>(editor, spGit));
-    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitPush>(editor, spGit));
-    //     editor.RegisterExCommand(std::make_shared<ZepExCommand_GitPull>(editor, spGit));
-    // }
+    if (auto spGit = editor.GetGit())
+    {
+        editor.RegisterExCommand(std::make_shared<ZepExCommand_GitStatus>(editor, spGit));
+        editor.RegisterExCommand(std::make_shared<ZepExCommand_GitDiff>(editor, spGit));
+        editor.RegisterExCommand(std::make_shared<ZepExCommand_VGitDiff>(editor, spGit));
+        editor.RegisterExCommand(std::make_shared<ZepExCommand_GitBlame>(editor, spGit));
+        editor.RegisterExCommand(std::make_shared<ZepExCommand_GitCommit>(editor, spGit));
+        editor.RegisterExCommand(std::make_shared<ZepExCommand_GitPush>(editor, spGit));
+        editor.RegisterExCommand(std::make_shared<ZepExCommand_GitPull>(editor, spGit));
+    }
 }
 
 bool ZepMode_Vim::GetCommand(CommandContext& context)
