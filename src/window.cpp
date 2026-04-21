@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <sstream>
@@ -2296,28 +2297,32 @@ NVec2i ZepWindow::BufferToDisplay(const GlyphIterator& loc)
     UpdateLayout();
 
     NVec2i ret(0, 0);
-    int line_number = 0;
+    auto target = loc.Index();
 
-    // TODO: Performance; quick lookup for line
-    for (auto& line : m_windowLines)
+    if (!m_windowLines.empty())
     {
-        // If inside the line...
-        if (line->lineByteRange.first <= loc.Index() && line->lineByteRange.second > loc.Index())
-        {
-            ret.y = line_number;
-            ret.x = 0;
+        auto itr = std::lower_bound(m_windowLines.begin(), m_windowLines.end(), target,
+            [](const SpanInfo* line, long value) {
+                return line->lineByteRange.second <= value;
+            });
 
-            // Scan the code points for where we are
-            for (auto& ch : line->lineCodePoints)
-            {
-                if (ch.iterator == loc)
-                {
-                    return ret;
-                }
-                ret.x++;
-            }
+        if (itr == m_windowLines.end())
+        {
+            --itr;
         }
-        line_number++;
+
+        size_t line_number = std::distance(m_windowLines.begin(), itr);
+        ret.y = long(line_number);
+        ret.x = 0;
+
+        for (auto& ch : (*itr)->lineCodePoints)
+        {
+            if (ch.iterator == loc)
+            {
+                return ret;
+            }
+            ret.x++;
+        }
     }
 
     assert(!m_windowLines.empty());
@@ -2326,7 +2331,6 @@ NVec2i ZepWindow::BufferToDisplay(const GlyphIterator& loc)
         return NVec2i(0, 0);
     }
 
-    // Max Last line, last code point offset
     ret.y = long(m_windowLines.size() - 1);
     ret.x = long(m_windowLines[m_windowLines.size() - 1]->lineCodePoints.size() - 1);
     return ret;
