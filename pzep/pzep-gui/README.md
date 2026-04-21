@@ -1,56 +1,80 @@
 # pzep-gui
 ## A GUI-Based Vim-Like Editor
 
-A standalone GUI implementation of the pZep editor using ImGui for rendering.
+A standalone GUI implementation of the pZep editor using **Raylib** for rendering.
 
 ---
 
 ## Features
 
 - Full Vim emulation (motion, operators, ex commands)
-- ImGui renderer with menus and dialogs
+- Raylib renderer - hardware accelerated with OpenGL
 - Multiple file editing with tabs/splits
 - Syntax highlighting
 - Git integration
 - Macros and folds
 - Multiple cursors
 - Minimap
+- Cross-platform (Windows, Linux, FreeBSD)
 
 ---
 
 ## Building
 
-### Windows
+### Prerequisites
+
+**Windows:**
 ```powershell
-cd platforms/build-win
-cmake .. -DBUILD_GUI=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build .
+vcpkg install raylib:x64-windows
 ```
 
-### Linux
+**Linux:**
 ```bash
-cd platforms/build-lin
-cmake .. -DBUILD_GUI=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build .
+sudo apt install libraylib-dev
 ```
 
-### FreeBSD
+**FreeBSD:**
 ```bash
-cd platforms/build-bsd
-cmake .. -DBUILD_GUI=ON -DCMAKE_BUILD_TYPE=Release
+sudo pkg install raylib
+```
+
+### Build
+
+```bash
+# Create build directory
+mkdir build
+cd build
+
+# Configure (using vcpkg on Windows)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build
 cmake --build .
 ```
 
----
-
-## Running
+### Running
 
 ```bash
 ./pzep-gui file.txt
 ```
 
+Or just:
+
+```bash
+./pzep-gui
+```
+
+For an empty buffer.
+
 ---
 
 ## Keybindings
 
-See main pZep documentation for full Vim keybinding reference.
+See the [User Guide](../docs/USER_GUIDE.md) for the full reference.
+
+Quick start:
+- `i` - Insert mode
+- `ESC` - Normal mode
+- `:w` - Save
+- `:q` - Quit
+- `h/j/k/l` - Navigate
