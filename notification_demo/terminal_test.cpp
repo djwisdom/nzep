@@ -1,85 +1,181 @@
-// Simple Terminal Notification Test
-// No dependencies - pure C++17
+// Simple ASCII Terminal Notification Test
+// No ANSI, no colors - just pure ASCII
 // Works on: Windows, Linux, FreeBSD
 
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 #include <thread>
 
 #include "../notifications.h"
-#include "../notifications_term.h"
 
 using namespace ZepNotifications;
 
 void PrintBanner()
 {
     std::cout << "\n";
-    std::cout << "╔══════════════════════════════════════════════════╗\n";
-    std::cout << "║     ZEP NOTIFICATION TERMINAL TEST         ║\n";
-    std::cout << "╚══════════════════════════════════════════════════╝\n";
+    std::cout << "+====================================+\n";
+    std::cout << "|     nZep TERMINAL TEST             |\n";
+    std::cout << "+====================================+\n";
     std::cout << "\n";
 }
 
-void DemoNotifications()
+void PrintNotification(const Notification& n)
 {
-    TerminalNotificationRenderer renderer;
+    std::string icon = " ";
+    if (n.severity == NotificationSeverity::Critical)
+        icon = "X";
+    else if (n.severity == NotificationSeverity::High)
+        icon = "!";
+    else
+        icon = ">";
+
+    std::cout << icon << " ";
+
+    // Format based on type
+    switch (n.type)
+    {
+    case NotificationType::BuildFailure:
+        std::cout << "BUILD: " << n.project;
+        if (!n.target.empty())
+            std::cout << " (" << n.target << ")";
+        if (!n.first_error.empty())
+            std::cout << " - " << n.first_error;
+        if (!n.error_location.empty())
+            std::cout << " at " << n.error_location;
+        break;
+
+    case NotificationType::TestFailure:
+        std::cout << "TEST: " << n.target;
+        if (!n.first_error.empty())
+            std::cout << " - " << n.first_error;
+        break;
+
+    case NotificationType::RuntimeError:
+        std::cout << "RUNTIME: " << n.project;
+        if (!n.first_error.empty())
+            std::cout << " - " << n.first_error;
+        if (!n.error_location.empty())
+            std::cout << " at " << n.error_location;
+        break;
+
+    case NotificationType::Deployment:
+        std::cout << "DEPLOY: " << n.project;
+        if (!n.target.empty())
+            std::cout << " - " << n.target;
+        if (!n.first_error.empty())
+            std::cout << " - " << n.first_error;
+        break;
+
+    case NotificationType::SecurityAlert:
+        std::cout << "SECURITY: " << n.project;
+        if (!n.first_error.empty())
+            std::cout << " - " << n.first_error;
+        break;
+
+    default:
+        std::cout << n.summary;
+    }
+
+    std::cout << "\n";
+
+    // Show location + link
+    if (!n.error_location.empty())
+    {
+        std::cout << "  -> Location: " << n.error_location << "\n";
+    }
+    if (!n.link.empty())
+    {
+        std::cout << "  -> Link: " << n.link << "\n";
+    }
+    if (n.file_path && n.file_line)
+    {
+        std::cout << "  -> EDITOR: " << *n.file_path << ":" << *n.file_line << " (click to open)\n";
+    }
+
+    std::cout << "\n";
+}
+
+void RunDemo()
+{
     NotificationManager mgr;
 
     std::cout << "[1] Adding sample notifications...\n\n";
 
-    // Add demo notifications
-    mgr.Add(BuildFailed(
-        "core-lib", "all", "undefined reference",
+    // Add notifications WITH file:line for editor integration
+    auto n1 = BuildFailed("core-lib", "all", "undefined reference",
         "src/util.cpp:128", "1234", "http://jenkins/build/1234")
-            .Build());
+                  .SetFile("src/util.cpp", 128)
+                  .Build();
+    mgr.Add(n1);
 
-    mgr.Add(TestFailed(
-        "auth-suite", "test_login: expected 200 got 500",
+    auto n2 = TestFailed("auth-suite", "test_login: expected 200 got 500",
         "http://jenkins/test/456")
-            .Build());
+                  .Build();
+    mgr.Add(n2);
 
-    mgr.Add(RuntimeError(
-        "auth-service", "NullPointerException",
-        "AuthController.login()", "req-abc123",
-        "http://trace/service/abc123")
-            .Build());
+    auto n3 = RuntimeError("auth-service", "NullPointerException",
+        "AuthController.login()", "req-abc123", "http://trace/abc123")
+                  .SetFile("src/auth.cpp", 42)
+                  .Build();
+    mgr.Add(n3);
 
-    mgr.Add(DeployComplete(
-        "staging", "v2.1.0", true,
+    auto n4 = DeployComplete("staging", "v2.1.0", true,
         "http://deploy/staging/789")
-            .Build());
+                  .Build();
+    mgr.Add(n4);
 
-    mgr.Add(SecurityAlert(
-        "lib/utils.js", NotificationSeverity::High,
-        "update lodash@>4.5.0",
-        "http://gh/advisory/789")
-            .Build());
+    auto n5 = SecurityAlert("lib/utils.js", NotificationSeverity::High,
+        "update lodash@>4.5.0", "http://gh/advisory/789")
+                  .Build();
+    mgr.Add(n5);
 
-    std::cout << "Notifications added: " << mgr.Count() << "\n";
+    std::cout << "Notifications: " << mgr.Count() << "\n";
     std::cout << "Critical: " << mgr.GetCritical().size() << "\n\n";
 
-    // Show platform
-    std::cout << "Platform: " << TerminalStyle::GetPlatformStyle() << "\n";
-    std::cout << "ANSI Support: " << (renderer.HasANSI() ? "Yes" : "No") << "\n\n";
+    // Print all notifications
+    std::cout << "+====================================+\n";
+    std::cout << "|         ALL NOTIFICATIONS          |\n";
+    std::cout << "+====================================+\n\n";
 
-    // Get terminal size
-    int w, h;
-    TerminalNotificationRenderer::GetTermSize(w, h);
-    std::cout << "Terminal: " << w << "x" << h << "\n\n";
+    int i = 1;
+    for (const auto& n : mgr.notifications)
+    {
+        std::cout << "[" << i << "] ";
+        PrintNotification(n);
+        i++;
+    }
 
-    // Display panel
-    std::cout << "Press Enter to see full panel display...\n";
-    std::cin.get();
+    std::cout << "+====================================+\n";
+    std::cout << "|           SUMMARY                 |\n";
+    std::cout << "+====================================+\n\n";
 
-    renderer.RenderPanel(mgr, w, h);
-}
+    auto critical = mgr.GetCritical();
+    if (critical.size() > 0)
+    {
+        std::cout << "ACTION REQUIRED: " << critical.size() << " critical issues\n";
+        for (const auto& n : critical)
+        {
+            std::cout << "  - " << n.project << ": " << n.first_error << "\n";
+        }
+    }
+    else
+    {
+        std::cout << "STATUS: All clear\n";
+    }
 
-void RunInteractive()
-{
-    TerminalNotificationApp app;
-    app.Init();
-    app.Run();
+    std::cout << "\n";
+    std::cout << "Platform: ";
+#ifdef _WIN32
+    std::cout << "Windows\n";
+#elif defined(__linux__)
+    std::cout << "Linux\n";
+#elif defined(__FreeBSD__)
+    std::cout << "FreeBSD\n";
+#else
+    std::cout << "Unknown\n";
+#endif
 }
 
 int main(int argc, char* argv[])
@@ -90,44 +186,49 @@ int main(int argc, char* argv[])
     PrintBanner();
 
     std::cout << "Choose test:\n";
-    std::cout << "  [1] Quick demo (print notifications)\n";
-    std::cout << "  [2] Interactive mode (arrow keys + Enter)\n";
-    std::cout << "  [3] Run all unit tests\n";
+    std::cout << "  [1] Quick demo (show notifications)\n";
+    std::cout << "  [2] Show editor integration\n";
     std::cout << "\n> ";
 
     int choice = '1';
     std::cin >> choice;
-    std::cin.ignore(); // consume newline
+    std::cin.ignore();
+
+    std::cout << "\n";
 
     switch (choice)
     {
     case 1:
-        std::cout << "\n=== QUICK DEMO ===\n\n";
-        DemoNotifications();
+        RunDemo();
         break;
 
     case 2:
-        std::cout << "\n=== INTERACTIVE MODE ===\n";
-        std::cout << "Controls: [C]ritical, [B]uild, [T]est, [Q]uit\n\n";
-        RunInteractive();
-        break;
+        std::cout << "+====================================+\n";
+        std::cout << "|       EDITOR INTEGRATION           |\n";
+        std::cout << "+====================================+\n\n";
 
-    case 3:
-        std::cout << "\n=== RUNNING UNIT TESTS ===\n\n";
-        // Note: gtest needs to be linked for this
-        // If built with tests, would run them here
-        std::cout << "(Run ./unittests.exe --gtest_filter='Notification*' for tests)\n";
+        std::cout << "To use the Zep editor:\n\n";
+        std::cout << "1. Build with ImGui (requires vcpkg):\n";
+        std::cout << "   mkdir build && cd build\n";
+        std::cout << "   cmake .. -DBUILD_IMGUI=ON -DBUILD_DEMOS=ON\n";
+        std::cout << "   cmake --build .\n\n";
+        std::cout << "2. Run the demo:\n";
+        std::cout << "   ./demos/demo_imgui/ZepDemo\n\n";
+
+        std::cout << "Alternative - VS Code extension:\n";
+        std::cout << "   Use VS Code with zep-mode or vim extension\n\n";
+
+        std::cout << "For the ImGui + Notification app:\n";
+        std::cout << "   See notification_demo/main.cpp\n";
+        std::cout << "   (requires Zep library built)\n";
         break;
 
     default:
-        std::cout << "Invalid choice, running demo...\n";
-        DemoNotifications();
+        RunDemo();
         break;
     }
 
     std::cout << "\n=== DONE ===\n";
-    std::cout << "\nPress Enter to exit...\n";
-    std::cin.get();
 
     return 0;
 }
