@@ -11,8 +11,12 @@ add_project_meta(META_FILES_TO_INCLUDE IS_IMGUI)
 
 find_package(tinyfiledialogs CONFIG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
-find_package(gl3w CONFIG REQUIRED)
+find_package(imgui CONFIG 1.80 REQUIRED)
+find_package(glad CONFIG REQUIRED)
+# Prefer GLAD over deprecated gl3w; fallback to gl3w for older builds
+if(NOT TARGET glad::glad)
+    find_package(gl3w CONFIG REQUIRED)
+endif()
 find_package(Freetype CONFIG REQUIRED)
 
 include(CMakePackageConfigHelpers)
@@ -77,7 +81,8 @@ target_link_libraries (${DEMO_NAME}
     $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
     $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
     imgui::imgui
-    unofficial::gl3w::gl3w
+    # Prefer GLAD over deprecated gl3w
+    $<IF:$<TARGET_EXISTS:glad::glad>,glad::glad,unofficial::gl3w::gl3w>
     tinyfiledialogs::tinyfiledialogs
     ${PLATFORM_LINKLIBS}
     )
