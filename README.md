@@ -236,6 +236,18 @@ renderer.RenderPanel(manager, width, height);
 - 200+ unit tests
 - Cross-platform (Windows, Linux, FreeBSD)
 
+### Vim Mode (nZep extensions)
+- **Ex Commands**: `:s` find/replace, `:w`, `:q`, `:wq`, `:buffers`, `:g`
+- **Buffer Commands**: `:e` file, `:bn`/:`:bp`/:`:b` navigation, `:sp` split
+- **:set Options**: number, wrap, autoindent, tabstop, expandtab, and more
+- **Git Integration**: `:Gstatus`, `:Gdiff`, `:vdiff`, `:Gblame`, `:Gcommit`, `:Gpush`, `:Gpull`
+- **Macros**: `q` recording, `@` playback
+- **Folds**: `zf`, `zd`, `zo`, `zc`
+- **Visual Mode**: `v`, `V`, `Ctrl+v` block
+- **Multiple Cursors**: `Ctrl+d` add cursor
+- **Terminal**: `:terminal`, `:!cmd`
+- **Error Pointers**: Scrollbar indicators for off-screen errors
+
 ### Notifications (nZep)
 - 12 notification types (Build, Test, Runtime, Deploy, Security, and more)
 - ImGui renderer with toasts
@@ -248,8 +260,7 @@ renderer.RenderPanel(manager, width, height);
 
 ## What's Not Done (Let's Be Honest)
 
-- **Vim mode**: Missing ex commands (`:s` for find/replace)
-- **UTF-8**: Work in progress
+- **Vim mode**: Missing paragraph motions, horizontal scroll, filter operator
 - **Editor**: No LSP client (that's a whole other thing)
 - **Notifications**: No persistence (runtime only)
 
@@ -275,6 +286,9 @@ But here's the thing - it's open source. Make it yours.
 - [Developer Manual](docs/NOTIFICATIONS_DEVELOPER_MANUAL.md)
 - [Security Report](SECURITY_REPORT.md)
 - [Full Analysis](REPORT.md)
+- [Vim Compatibility Report](docs/VIM_COMPATIBILITY_REPORT.md)
+- [Vim Commands Report](docs/VIM_COMMANDS_REPORT.md)
+- [Technical Debt Report](docs/TECHNICAL_DEBT_REPORT.md)
 
 ---
 
