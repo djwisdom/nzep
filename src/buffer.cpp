@@ -22,38 +22,31 @@ namespace
 // assumes a word is alphanumeric or underscore for consistency
 inline bool IsWordChar(const char c)
 {
-    auto ch = ToASCII(c);
-    return std::isalnum(ch) || ch == '_';
+    return std::isalnum((unsigned char)c) || c == '_';
 }
 inline bool IsWordOrSepChar(const char c)
 {
-    auto ch = ToASCII(c);
-    return std::isalnum(ch) || ch == '_' || ch == ' ' || ch == '\n' || ch == 0;
+    return std::isalnum((unsigned char)c) || c == '_' || c == ' ' || c == '\n' || c == 0;
 }
 inline bool IsWORDChar(const char c)
 {
-    auto ch = ToASCII(c);
-    return std::isgraph(ch);
+    return std::isgraph((unsigned char)c);
 }
 inline bool IsWORDOrSepChar(const char c)
 {
-    auto ch = ToASCII(c);
-    return std::isgraph(ch) || ch == ' ' || ch == '\n' || ch == 0;
+    return std::isgraph((unsigned char)c) || c == ' ' || c == '\n' || c == 0;
 }
 inline bool IsSpace(const char c)
 {
-    auto ch = ToASCII(c);
-    return ch == ' ';
+    return c == ' ';
 }
 inline bool IsSpaceOrNewline(const char c)
 {
-    auto ch = ToASCII(c);
-    return ch == ' ' || ch == '\n';
+    return c == ' ' || c == '\n';
 }
 inline bool IsSpaceOrTerminal(const char c)
 {
-    auto ch = ToASCII(c);
-    return ch == ' ' || ch == 0 || ch == '\n';
+    return c == ' ' || c == 0 || c == '\n';
 }
 
 using fnMatch = std::function<bool>(const char);
