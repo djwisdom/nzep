@@ -2,6 +2,8 @@
 // Compile after building Zep library
 // Link: Zep, ImGui, SDL2, OpenGL
 
+#include "notifications.h"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -32,18 +34,7 @@ struct ZepFont_ImGui;
 
 } // namespace Zep
 
-struct NotificationItem
-{
-    std::string source;
-    std::string message;
-    std::string timestamp;
-    enum class Status
-    {
-        Pass,
-        Fail,
-        Info
-    } status;
-};
+// Using ZepNotifications::Notification instead of old NotificationItem
 
 class NotificationApp
 {
@@ -57,7 +48,7 @@ public:
     bool IsRunning() const;
 
     // Add notification to the feed
-    void AddNotification(NotificationItem::Status status,
+    void AddNotification(ZepNotifications::NotificationSeverity severity,
         const std::string& source,
         const std::string& message);
 
@@ -65,9 +56,10 @@ private:
     void RenderNotificationPanel(float width, float height);
     void RenderEditorPanel(float x, float y, float width, float height);
     void RenderStatusBar(float width);
+    void RenderNotificationToast(const ZepNotifications::Notification& n);
 
     std::unique_ptr<Zep::ZepEditor_ImGui> spEditor;
-    std::vector<NotificationItem> notifications;
+    ZepNotifications::NotificationManager notificationManager;
     bool running = false;
 };
 
@@ -109,12 +101,46 @@ error = ["ERROR", "FAIL", "CRITICAL"]
 warning = ["WARN", "deprecated"]
 )");
 
-    // Add some sample notifications
-    notifications = {
-        { "GitHub", "✓ main branch build passed", "2m ago", NotificationItem::Status::Pass },
-        { "Jenkins", "✗ build #4521 failed", "5m ago", NotificationItem::Status::Fail },
-        { "Deploy", "✓ v2.1.0 → staging", "15m ago", NotificationItem::Status::Pass },
-    };
+    // Add sample developer notifications (serious, actionable)
+    using namespace ZepNotifications;
+
+    notificationManager.Add(BuildFailed(
+        "core-lib", // project
+        "all", // target
+        "undefined reference", // error
+        "src/util.cpp:128", // location
+        "1234", // build ID
+        "http://jenkins/build/1234" // log link
+        )
+            .Build());
+
+    notificationManager.Add(TestFailed(
+        "auth-suite",
+        "test_login: expected 200 got 500",
+        "http://jenkins/test/456")
+            .Build());
+
+    notificationManager.Add(RuntimeError(
+        "auth-service",
+        "NullPointerException",
+        "AuthController.login()",
+        "req-abc123",
+        "http://trace/service/abc123")
+            .Build());
+
+    notificationManager.Add(DeployComplete(
+        "staging",
+        "v2.1.0",
+        true, // success
+        "http://deploy/staging/789")
+            .Build());
+
+    notificationManager.Add(SecurityAlert(
+        "lib/utils.js",
+        NotificationSeverity::High,
+        "update lodash@>4.5.0",
+        "http://gh/advisory/789")
+            .Build());
 
     running = true;
     return true;
@@ -141,6 +167,8 @@ void NotificationApp::Render()
 
 void NotificationApp::RenderNotificationPanel(float width, float height)
 {
+    using namespace ZepNotifications;
+
     // Pseudo-ImGui calls - replace with actual ImGui in your app
     (void)width;
     (void)height;
@@ -150,18 +178,34 @@ void NotificationApp::RenderNotificationPanel(float width, float height)
     // ImGui::SetNextWindowSize(ImVec2(width, height));
     // ImGui::Begin("Notifications");
 
-    for (const auto& notif : notifications)
+    for (const auto& n : notificationManager.notifications)
     {
-        // Color by status
-        // Pass: green, Fail: red, Info: blue
-        // ImGui::TextColored(color, "[%s] %s: %s",
-        //     notif.status == NotificationItem::Status::Pass ? "✓" :
-        //     notif.status == NotificationItem::Status::Fail ? "✗" : "ℹ",
-        //     notif.source.c_str(),
-        //     notif.message.c_str());
-        //
-        // ImGui::SameLine();
-        // ImGui::TextColored(gray, notif.timestamp.c_str());
+        // Format each notification per the design spec
+        std::string formatted;
+
+        switch (n.type)
+        {
+        case NotificationType::BuildFailure:
+            formatted = FormatBuildFailure(n);
+            break;
+        case NotificationType::TestFailure:
+            formatted = FormatTestFailure(n);
+            break;
+        case NotificationType::RuntimeError:
+            formatted = FormatRuntimeError(n);
+            break;
+        case NotificationType::Deployment:
+            formatted = FormatDeployment(n);
+            break;
+        case NotificationType::SecurityAlert:
+            formatted = FormatSecurityAlert(n);
+            break;
+        default:
+            formatted = n.summary;
+        }
+
+        // Color by severity: Critical=Red, High=Orange, Medium=Yellow, Low=Blue
+        // ImGui::TextColored(severityColor, formatted.c_str());
     }
     // ImGui::End();
 }
@@ -199,7 +243,7 @@ void NotificationApp::RenderStatusBar(float width)
 
 void NotificationApp::Shutdown()
 {
-    notifications.clear();
+    notificationManager.Clear();
     spEditor.reset();
 }
 
@@ -208,23 +252,19 @@ bool NotificationApp::IsRunning() const
     return running;
 }
 
-void NotificationApp::AddNotification(NotificationItem::Status status,
+void NotificationApp::AddNotification(ZepNotifications::NotificationSeverity severity,
     const std::string& source,
     const std::string& message)
 {
-    NotificationItem item;
-    item.status = status;
-    item.source = source;
-    item.message = message;
-    item.timestamp = "just now";
+    using namespace ZepNotifications;
 
-    notifications.insert(notifications.begin(), item);
+    Notification n;
+    n.summary = message;
+    n.project = source;
+    n.severity = severity;
+    n.timestamp = std::chrono::system_clock::now();
 
-    // Keep only last 100 notifications
-    if (notifications.size() > 100)
-    {
-        notifications.resize(100);
-    }
+    notificationManager.Add(n);
 }
 
 // Main entry point (pseudo-code for SDL2 + ImGui loop) --------------------------------
