@@ -5,18 +5,19 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED OFF)
 
 # Manual paths - NO vcpkg toolchain
-set(RAYLIB_ROOT "C:/vcpkg/packages/raylib_x64-windows")
+set(RAYLIB_ROOT "C:/vcpkg/included/x64-windows")
+set(VCPKG_ROOT "C:/vcpkg/included/x64-windows")
 set(ZEP_ROOT "C:/Users/casse/github/zep")
 
 # Include directories  
 include_directories(
     "${ZEP_ROOT}/include"
     "${ZEP_ROOT}/include/zep"
-    "${RAYLIB_ROOT}/include"
+    "${VCPKG_ROOT}/include"
 )
 
 # Library paths  
-set(RAYLIB_LIB "${RAYLIB_ROOT}/lib/raylib.lib")
+set(RAYLIB_LIB "C:/vcpkg/installed/x64-windows/lib/raylib.lib")
 set(ZEP_LIB "${ZEP_ROOT}/build-win/lib/Release/Zep.lib")
 
 # Source files

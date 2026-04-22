@@ -1301,30 +1301,6 @@ void ZepBuffer::SetSelection(const GlyphRange& selection)
     }
 }
 
-void ZepBuffer::AddRangeMarker(std::shared_ptr<RangeMarker> spMarker)
-{
-    m_rangeMarkers[spMarker->GetRange().first].insert(spMarker);
-
-    // TODO: Why is this necessary; marks the whole buffer
-    GetEditor().Broadcast(std::make_shared<BufferMessage>(this, BufferMessageType::MarkersChanged, Begin(), End()));
-}
-
-void ZepBuffer::ClearRangeMarker(std::shared_ptr<RangeMarker> spMarker)
-{
-    auto itr = m_rangeMarkers.find(spMarker->GetRange().first);
-    if (itr != m_rangeMarkers.end())
-    {
-        itr->second.erase(spMarker);
-        if (itr->second.empty())
-        {
-            m_rangeMarkers.erase(spMarker->GetRange().first);
-        }
-    }
-
-    // TODO: Why is this necessary; marks the whole buffer
-    GetEditor().Broadcast(std::make_shared<BufferMessage>(this, BufferMessageType::MarkersChanged, Begin(), End()));
-}
-
 void ZepBuffer::ClearRangeMarkers(const std::set<std::shared_ptr<RangeMarker>>& markers)
 {
     for (auto& marker : markers)

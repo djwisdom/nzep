@@ -142,6 +142,17 @@ void ZepMode_Vim::AddNavigationKeyMaps(bool allowInVisualMode)
     AddKeyMapWithCountRegisters(navigationMaps, { "<C-u>" }, id_MotionHalfPageBackward);
     AddKeyMapWithCountRegisters(navigationMaps, { "G" }, id_MotionGotoLine);
 
+    // Screen Redraw Motions (z-prefixed)
+    AddKeyMapWithCountRegisters(navigationMaps, { "z<CR>", "z<Return>", "zt" }, id_MotionScreenRedrawTop);
+    AddKeyMapWithCountRegisters(navigationMaps, { "z-", "zb" }, id_MotionScreenRedrawBottom);
+    AddKeyMapWithCountRegisters(navigationMaps, { "zz" }, id_MotionScreenRedrawCenter);
+
+    // Horizontal Scroll (z-prefixed)
+    AddKeyMapWithCountRegisters(navigationMaps, { "zH" }, id_MotionScreenScrollHalfLeft);
+    AddKeyMapWithCountRegisters(navigationMaps, { "zL" }, id_MotionScreenScrollHalfRight);
+    AddKeyMapWithCountRegisters(navigationMaps, { "zh" }, id_MotionScreenScrollLeft);
+    AddKeyMapWithCountRegisters(navigationMaps, { "zl" }, id_MotionScreenScrollRight);
+
     // Line Motions
     AddKeyMapWithCountRegisters(navigationMaps, { "$", "<End>" }, id_MotionLineEnd);
     AddKeyMapWithCountRegisters(navigationMaps, { "^" }, id_MotionLineFirstChar);
@@ -304,12 +315,19 @@ void ZepMode_Vim::SetupKeyMaps()
 
 void ZepMode_Vim::Begin(ZepWindow* pWindow)
 {
+    fprintf(stderr, "DEBUG: ZepMode_Vim::Begin called, pWindow = %p\n", pWindow);
+    fflush(stderr);
+
     ZepMode::Begin(pWindow);
+    fprintf(stderr, "DEBUG: ZepMode_Vim::Begin after ZepMode::Begin\n");
+    fflush(stderr);
 
     GetEditor().SetCommandText(m_currentCommand);
     m_currentMode = EditorMode::Normal;
     m_currentCommand.clear();
     m_dotCommand.clear();
+    fprintf(stderr, "DEBUG: ZepMode_Vim::Begin done\n");
+    fflush(stderr);
 }
 
 void ZepMode_Vim::PreDisplay(ZepWindow& window)
@@ -1379,6 +1397,7 @@ void RegisterVimExCommands(ZepEditor& editor)
     editor.RegisterExCommand(std::make_shared<ZepExCommand_Split>(editor));
     editor.RegisterExCommand(std::make_shared<ZepExCommand_Set>(editor));
 
+    // Git commands
     if (auto spGit = editor.GetGit())
     {
         editor.RegisterExCommand(std::make_shared<ZepExCommand_GitStatus>(editor, spGit));

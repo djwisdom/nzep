@@ -1,5 +1,7 @@
 #include "zep/git.h"
+#include "zep/commands.h"
 #include "zep/editor.h"
+#include "zep/splits.h"
 #include "zep/tab_window.h"
 #include "zep/theme.h"
 #include "zep/window.h"
@@ -471,31 +473,39 @@ std::string ZepGit::RunGitCommand(const std::vector<std::string>& args, const fs
 
     return result;
 }
-}
+
+} // namespace Zep
+
+namespace Zep
+{
 
 // Git Status Command
 void ZepExCommand_GitStatus::Run(const std::vector<std::string>& args)
 {
-    auto output = m_spGit->GetStatus();
-
-    auto pTab = GetEditor().GetActiveTabWindow();
-    if (!pTab)
+    if (m_spGit)
     {
-        return;
-    }
-
-    auto pBuffer = GetEditor().GetFileBuffer(":Git Status:", 0, true);
-    if (pBuffer)
-    {
-        pBuffer->SetText(output);
-        pTab->AddWindow(pBuffer);
+        GetEditor().SetCommandText(m_spGit->GetStatus());
     }
 }
 
-// Git Diff Command
 void ZepExCommand_GitDiff::Run(const std::vector<std::string>& args)
 {
     auto pWindow = GetEditor().GetActiveWindow();
+    if (!pWindow || !m_spGit)
+    {
+        return;
+    }
+
+    auto output = m_spGit->GetDiff(pWindow->GetBuffer().GetFilePath());
+    GetEditor().SetCommandText(output);
+}
+
+void ZepExCommand_VGitDiff::Run(const std::vector<std::string>& args)
+{
+    if (!m_spGit)
+        return;
+
+    auto pWindow = GetEditor().GetActiveWindow();
     if (!pWindow)
     {
         return;
@@ -517,39 +527,11 @@ void ZepExCommand_GitDiff::Run(const std::vector<std::string>& args)
     }
 }
 
-// Vertical Git Diff Command
-void ZepExCommand_VGitDiff::Run(const std::vector<std::string>& args)
-{
-    auto pWindow = GetEditor().GetActiveWindow();
-    if (!pWindow)
-    {
-        return;
-    }
-
-    auto output = m_spGit->GetDiff(pWindow->GetBuffer().GetFilePath());
-
-    auto pTab = GetEditor().GetActiveTabWindow();
-    if (!pTab)
-    {
-        return;
-    }
-
-    auto pBuffer = GetEditor().GetFileBuffer(":Git Diff:", 0, true);
-    if (pBuffer)
-    {
-        pBuffer->SetText(output);
-        auto pWin = pTab->AddWindow(pBuffer);
-        if (pWin)
-        {
-            pWin->GetLayout().direction = SplitDirection::Right;
-            pWin->SetRelativeSize(0.5f);
-        }
-    }
-}
-
-// Git Blame Command
 void ZepExCommand_GitBlame::Run(const std::vector<std::string>& args)
 {
+    if (!m_spGit)
+        return;
+
     auto pWindow = GetEditor().GetActiveWindow();
     if (!pWindow)
     {
@@ -586,9 +568,11 @@ void ZepExCommand_GitBlame::Run(const std::vector<std::string>& args)
     }
 }
 
-// Git Commit Command
 void ZepExCommand_GitCommit::Run(const std::vector<std::string>& args)
 {
+    if (!m_spGit)
+        return;
+
     if (args.size() < 2)
     {
         GetEditor().SetCommandText("Gcommit requires a commit message");
@@ -615,9 +599,11 @@ void ZepExCommand_GitCommit::Run(const std::vector<std::string>& args)
     }
 }
 
-// Git Push Command
 void ZepExCommand_GitPush::Run(const std::vector<std::string>& args)
 {
+    if (!m_spGit)
+        return;
+
     if (m_spGit->Push())
     {
         GetEditor().SetCommandText("Push successful");
@@ -628,9 +614,11 @@ void ZepExCommand_GitPush::Run(const std::vector<std::string>& args)
     }
 }
 
-// Git Pull Command
 void ZepExCommand_GitPull::Run(const std::vector<std::string>& args)
 {
+    if (!m_spGit)
+        return;
+
     if (m_spGit->Pull())
     {
         GetEditor().SetCommandText("Pull successful");

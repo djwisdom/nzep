@@ -46,7 +46,9 @@ ${ZEP_ROOT}/src/commands.cpp
 ${ZEP_ROOT}/src/display.cpp
 ${ZEP_ROOT}/src/editor.cpp
 ${ZEP_ROOT}/src/filesystem.cpp
- #${ZEP_ROOT}/src/git.cpp  // temporarily disabled due to API mismatches
+${ZEP_ROOT}/src/git.cpp
+${ZEP_ROOT}/src/fold.cpp
+${ZEP_ROOT}/src/raylib/display_raylib.cpp
 ${ZEP_ROOT}/src/indexer.cpp
 ${ZEP_ROOT}/src/keymap.cpp
 ${ZEP_ROOT}/src/line_widgets.cpp
@@ -92,16 +94,17 @@ LIST(APPEND SRC_INCLUDE ${ZEP_ROOT}/src ${ZEP_ROOT}/src/mcommon)
      endif()
  endif()
 
- target_include_directories(Zep 
-     PRIVATE
-         ${ZEP_ROOT}/src/mcommon
-         ${ZEP_ROOT}/src
-         ${SRC_INCLUDE}
-         ${CMAKE_BINARY_DIR}
-         ${ZEP_ROOT}/include
-     PUBLIC
-         $<INSTALL_INTERFACE:include>
-     ) 
+target_include_directories(Zep 
+    PRIVATE
+        ${ZEP_ROOT}/src/mcommon
+        ${ZEP_ROOT}/src
+        ${SRC_INCLUDE}
+        ${CMAKE_BINARY_DIR}
+        ${ZEP_ROOT}/include
+        C:/Users/casse/github/vcpkg/installed/x64-windows/include
+    PUBLIC
+        $<INSTALL_INTERFACE:include>
+      )
 
 if (TARGET_LINUX)
 target_link_libraries(Zep

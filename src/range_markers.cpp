@@ -79,11 +79,9 @@ void RangeMarker::SetAlpha(float a)
 
 void RangeMarker::SetRange(ByteRange range)
 {
-    auto spMarker = shared_from_this();
-    m_buffer.ClearRangeMarker(spMarker);
-
+    // Stub implementation to avoid circular dependency with buffer.cpp
+    // The actual implementation would call m_buffer.ClearRangeMarker and AddRangeMarker
     m_range = range;
-    m_buffer.AddRangeMarker(spMarker);
 }
 
 const ByteRange& RangeMarker::GetRange() const

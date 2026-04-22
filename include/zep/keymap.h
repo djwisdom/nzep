@@ -105,6 +105,16 @@ DECLARE_COMMANDID(MotionPreviousMarker)
 DECLARE_COMMANDID(MotionNextSearch)
 DECLARE_COMMANDID(MotionPreviousSearch)
 
+DECLARE_COMMANDID(MotionScreenRedrawTop)
+DECLARE_COMMANDID(MotionScreenRedrawCenter)
+DECLARE_COMMANDID(MotionScreenRedrawBottom)
+
+// Horizontal scroll
+DECLARE_COMMANDID(MotionScreenScrollLeft) // zh
+DECLARE_COMMANDID(MotionScreenScrollRight) // zl
+DECLARE_COMMANDID(MotionScreenScrollHalfLeft) // zH
+DECLARE_COMMANDID(MotionScreenScrollHalfRight) // zL
+
 DECLARE_COMMANDID(MotionLineEnd)
 DECLARE_COMMANDID(MotionLineBeyondEnd)
 DECLARE_COMMANDID(MotionLineBegin)

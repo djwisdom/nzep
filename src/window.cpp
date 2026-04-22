@@ -2062,6 +2062,21 @@ void ZepWindow::Display()
         }
     }
 
+    // Draw ~ for empty lines (Vim-style)
+    for (long windowLine = m_visibleLineIndices.x; windowLine < m_visibleLineIndices.y; windowLine++)
+    {
+        auto& lineInfo = *m_windowLines[windowLine];
+        // Check if line is empty - lineByteRange.first == lineByteRange.second means empty
+        bool isEmpty = (lineInfo.lineByteRange.first == lineInfo.lineByteRange.second);
+        if (isEmpty)
+        {
+            auto& font = *lineInfo.pFont;
+            auto tildePos = NVec2f(m_textRegion->rect.Left() + m_xPad, ToWindowY(lineInfo.yOffsetPx + lineInfo.padding.x));
+            auto tildeColor = m_pBuffer->GetTheme().GetColor(ThemeColor::LineNumber);
+            display.DrawChars(font, tildePos, tildeColor, (const uint8_t*)"~", (const uint8_t*)"~" + 1);
+        }
+    }
+
     DisplayMarkerHints();
 
     if (ZTestFlags(GetWindowFlags(), WindowFlags::GridStyle))

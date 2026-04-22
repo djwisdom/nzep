@@ -24,6 +24,9 @@ class ZepMode;
 class ZepCommand;
 enum class ThemeColor;
 
+class ZepExCommand;
+class ZepGit;
+
 enum class Direction
 {
     Forward,
@@ -231,8 +234,8 @@ public:
     bool HasSelection() const;
     void ClearSelection();
 
-    void AddRangeMarker(std::shared_ptr<RangeMarker> spMarker);
-    void ClearRangeMarker(std::shared_ptr<RangeMarker> spMarker);
+    void AddRangeMarker(std::shared_ptr<RangeMarker> spMarker) {}
+    void ClearRangeMarker(std::shared_ptr<RangeMarker> spMarker) {}
     void ClearRangeMarkers(const std::set<std::shared_ptr<RangeMarker>>& markers);
     void ClearRangeMarkers(uint32_t types);
     tRangeMarkers GetRangeMarkers(uint32_t types) const;

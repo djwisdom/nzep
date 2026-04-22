@@ -1,8 +1,23 @@
 #include "zep/raylib/display_raylib.h"
+#include <cstdio>
 #include <cstring>
+
+// Note: Don't include windows.h - it conflicts with raylib function names
 
 namespace Zep
 {
+
+//------------------------------------------------------------------------------------------
+// Simple helper to get glyph index for a codepoint
+//------------------------------------------------------------------------------------------
+static int GetGlyphIndexOrZero(::Font font, int codepoint)
+{
+    // Simple approach: check if codepoint is in basic ASCII range
+    if (codepoint >= 32 && codepoint <= 126)
+        return codepoint - 32;
+    // For other chars, just return 0 (will show as missing glyph)
+    return 0;
+}
 
 //------------------------------------------------------------------------------------------
 // ZepFont_Raylib
@@ -34,6 +49,7 @@ NVec2f ZepFont_Raylib::GetTextSize(const uint8_t* pBegin, const uint8_t* pEnd) c
     if (pEnd == nullptr)
         pEnd = pBegin + strlen((const char*)pBegin);
 
+    // Use m_pixelHeight which is now 32 (matches font atlas)
     float width = MeasureTextEx(m_font, (const char*)pBegin, (float)m_pixelHeight, 1.0f).x;
     return NVec2f(width, (float)m_pixelHeight);
 }
@@ -48,20 +64,33 @@ ZepDisplay_Raylib::ZepDisplay_Raylib(int width, int height)
     , m_height(height)
     , m_clipEnabled(false)
 {
+    SetExitKey(0);
     InitWindow(width, height, "pZep-GUI - Vim-like Editor");
     SetTargetFPS(60);
 
-    // Load default font with UTF-8 support
-    // Using built-in default font
-    m_defaultFont = GetFontDefault();
-    if (m_defaultFont.texture.id == 0)
+    // Load font at size 16 with ASCII codepoints
+    // Smaller size for a more standard editor appearance
+    std::vector<int> codepoints;
+    for (int c = 32; c <= 126; c++)
+        codepoints.push_back(c);
+
+    m_defaultFont = LoadFontEx("C:/Windows/Fonts/CascadiaMono.ttf", 16, codepoints.data(), (int)codepoints.size());
+    printf("INFO: FONT: CascadiaMono loaded: baseSize=%d, glyphCount=%d\n", m_defaultFont.baseSize, m_defaultFont.glyphCount);
+    fflush(stdout);
+
+    // If load failed, fall back to default raylib font
+    if (m_defaultFont.glyphCount < 10)
     {
-        // Try loading a basic font if default fails
-        // In production, you'd bundle a TTF file
+        if (m_defaultFont.texture.id != 0)
+            UnloadFont(m_defaultFont);
+        m_defaultFont = GetFontDefault();
     }
 
-    // Create default font entry
+    // Create default font entry - tell Zep the pixel height is 16
+    // This matches the font atlas size, so measurement and drawing are consistent
     m_spDefaultFont = std::make_shared<ZepFont_Raylib>(*this, m_defaultFont, 16);
+    printf("INFO: FONT: ZepFont_Raylib created with m_pixelHeight=16\n");
+    fflush(stdout);
 }
 
 ZepDisplay_Raylib::~ZepDisplay_Raylib()
@@ -100,13 +129,16 @@ void ZepDisplay_Raylib::DrawChars(ZepFont& font, const NVec2f& pos, const NVec4f
         (unsigned char)(col.w * 255.0f)
     };
 
-    // Get font size from ZepFont
     int fontSize = font.GetPixelHeight();
     if (fontSize <= 0)
         fontSize = 16;
 
-    // Cast to non-const for Raylib
-    DrawTextEx(m_defaultFont, (const char*)text_begin, { pos.x, pos.y }, (float)fontSize, 1.0f, c);
+    // Round position to integer to avoid pixel alignment issues
+    float x = roundf(pos.x);
+    float y = roundf(pos.y);
+
+    // Use spacing of 1.0 to match MeasureTextEx in GetTextSize
+    DrawTextEx(m_defaultFont, (const char*)text_begin, { x, y }, (float)fontSize, 1.0f, c);
 }
 
 void ZepDisplay_Raylib::DrawRectFilled(const NRectf& rc, const NVec4f& col) const
@@ -117,7 +149,7 @@ void ZepDisplay_Raylib::DrawRectFilled(const NRectf& rc, const NVec4f& col) cons
         (unsigned char)(col.z * 255.0f),
         (unsigned char)(col.w * 255.0f)
     };
-    DrawRectangle((int)rc.x, (int)rc.y, (int)rc.w, (int)rc.h, c);
+    DrawRectangle((int)rc.Left(), (int)rc.Top(), (int)rc.Width(), (int)rc.Height(), c);
 }
 
 void ZepDisplay_Raylib::SetClipRect(const NRectf& rc)
@@ -150,14 +182,13 @@ void ZepDisplay_Raylib::BeginFrame()
 {
     BeginDrawing();
 
-    // Clear with dark background (like a terminal)
-    ClearBackground({ 26, 26, 26, 255 });
+    NVec4f bgColor(26.0f / 255.0f, 26.0f / 255.0f, 26.0f / 255.0f, 1.0f);
+    ClearBackground(bgColor);
 
-    // Apply clipping if enabled
     if (m_clipEnabled)
     {
-        BeginScissorMode((int)m_clipRect.x, (int)m_clipRect.y,
-            (int)m_clipRect.w, (int)m_clipRect.h);
+        BeginScissorMode((int)m_clipRect.Left(), (int)m_clipRect.Top(),
+            (int)m_clipRect.Width(), (int)m_clipRect.Height());
     }
 }
 

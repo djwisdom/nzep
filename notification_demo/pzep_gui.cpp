@@ -1,27 +1,20 @@
-// pzep-gui: A Vim-like editor using Raylib
-// Main application entry point
-
-#include <cstring>
+#include <cstdio>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "zep/buffer.h"
+#include <raylib.h>
+
 #include "zep/editor.h"
+#include "zep/mcommon/math/math.h"
 #include "zep/mode_standard.h"
 #include "zep/mode_vim.h"
 #include "zep/raylib/display_raylib.h"
-#include "zep/tab_window.h"
 #include "zep/theme.h"
-#include "zep/window.h"
 
-// Key mapping from Raylib to Zep
-#include "zep/mcommon/keymap.h"
-
-using namespace Zep;
-
-static const int SCREEN_WIDTH = 1280;
-static const int SCREEN_HEIGHT = 800;
+constexpr int SCREEN_WIDTH = 1280;
+constexpr int SCREEN_HEIGHT = 800;
 
 void PrintWelcome()
 {
@@ -41,50 +34,14 @@ void PrintWelcome()
     std::cout << "  :bn       - Next buffer" << std::endl;
     std::cout << "  :bp       - Previous buffer" << std::endl;
     std::cout << "  :set      - Toggle options" << std::endl;
-    std::cout << std::endl;
 }
 
-// Map Raylib key codes to Zep key codes
-static long MapKey(int raylibKey)
+long MapKey(int raylibKey)
 {
     switch (raylibKey)
     {
     case KEY_NULL:
         return 0;
-    case KEY_APOSTROPHE:
-        return '\'';
-    case KEY_COMMA:
-        return ',';
-    case KEY_MINUS:
-        return '-';
-    case KEY_PERIOD:
-        return '.';
-    case KEY_SLASH:
-        return '/';
-    case KEY_ZERO:
-        return '0';
-    case KEY_ONE:
-        return '1';
-    case KEY_TWO:
-        return '2';
-    case KEY_THREE:
-        return '3';
-    case KEY_FOUR:
-        return '4';
-    case KEY_FIVE:
-        return '5';
-    case KEY_SIX:
-        return '6';
-    case KEY_SEVEN:
-        return '7';
-    case KEY_EIGHT:
-        return '8';
-    case KEY_NINE:
-        return '9';
-    case KEY_SEMICOLON:
-        return ';';
-    case KEY_EQUAL:
-        return '=';
     case KEY_A:
         return 'a';
     case KEY_B:
@@ -137,6 +94,40 @@ static long MapKey(int raylibKey)
         return 'y';
     case KEY_Z:
         return 'z';
+    case KEY_APOSTROPHE:
+        return '\'';
+    case KEY_COMMA:
+        return ',';
+    case KEY_MINUS:
+        return '-';
+    case KEY_PERIOD:
+        return '.';
+    case KEY_SLASH:
+        return '/';
+    case KEY_ZERO:
+        return '0';
+    case KEY_ONE:
+        return '1';
+    case KEY_TWO:
+        return '2';
+    case KEY_THREE:
+        return '3';
+    case KEY_FOUR:
+        return '4';
+    case KEY_FIVE:
+        return '5';
+    case KEY_SIX:
+        return '6';
+    case KEY_SEVEN:
+        return '7';
+    case KEY_EIGHT:
+        return '8';
+    case KEY_NINE:
+        return '9';
+    case KEY_SEMICOLON:
+        return ';';
+    case KEY_EQUAL:
+        return '=';
     case KEY_LEFT_BRACKET:
         return '[';
     case KEY_BACKSLASH:
@@ -148,57 +139,57 @@ static long MapKey(int raylibKey)
     case KEY_SPACE:
         return ' ';
     case KEY_ESCAPE:
-        return ExtKeys::ESCAPE;
+        return Zep::ExtKeys::ESCAPE;
     case KEY_ENTER:
-        return ExtKeys::RETURN;
+        return Zep::ExtKeys::RETURN;
     case KEY_TAB:
-        return ExtKeys::TAB;
+        return Zep::ExtKeys::TAB;
     case KEY_BACKSPACE:
-        return ExtKeys::BACKSPACE;
+        return Zep::ExtKeys::BACKSPACE;
     case KEY_UP:
-        return ExtKeys::UP;
+        return Zep::ExtKeys::UP;
     case KEY_DOWN:
-        return ExtKeys::DOWN;
+        return Zep::ExtKeys::DOWN;
     case KEY_LEFT:
-        return ExtKeys::LEFT;
+        return Zep::ExtKeys::LEFT;
     case KEY_RIGHT:
-        return ExtKeys::RIGHT;
+        return Zep::ExtKeys::RIGHT;
     case KEY_F1:
-        return ExtKeys::F1;
+        return Zep::ExtKeys::F1;
     case KEY_F2:
-        return ExtKeys::F2;
+        return Zep::ExtKeys::F2;
     case KEY_F3:
-        return ExtKeys::F3;
+        return Zep::ExtKeys::F3;
     case KEY_F4:
-        return ExtKeys::F4;
+        return Zep::ExtKeys::F4;
     case KEY_F5:
-        return ExtKeys::F5;
+        return Zep::ExtKeys::F5;
     case KEY_F6:
-        return ExtKeys::F6;
+        return Zep::ExtKeys::F6;
     case KEY_F7:
-        return ExtKeys::F7;
+        return Zep::ExtKeys::F7;
     case KEY_F8:
-        return ExtKeys::F8;
+        return Zep::ExtKeys::F8;
     case KEY_F9:
-        return ExtKeys::F9;
+        return Zep::ExtKeys::F9;
     case KEY_F10:
-        return ExtKeys::F10;
+        return Zep::ExtKeys::F10;
     case KEY_F11:
-        return ExtKeys::F11;
+        return Zep::ExtKeys::F11;
     case KEY_F12:
-        return ExtKeys::F12;
+        return Zep::ExtKeys::F12;
     case KEY_HOME:
-        return ExtKeys::HOME;
+        return Zep::ExtKeys::HOME;
     case KEY_END:
-        return ExtKeys::END;
+        return Zep::ExtKeys::END;
     case KEY_PAGE_UP:
-        return ExtKeys::PAGE_UP;
+        return Zep::ExtKeys::PAGEUP;
     case KEY_PAGE_DOWN:
-        return ExtKeys::PAGE_DOWN;
+        return Zep::ExtKeys::PAGEDOWN;
     case KEY_INSERT:
-        return ExtKeys::INSERT;
+        return 'i';
     case KEY_DELETE:
-        return ExtKeys::DEL;
+        return Zep::ExtKeys::DEL;
     case KEY_KP_0:
         return '0';
     case KEY_KP_1:
@@ -219,14 +210,8 @@ static long MapKey(int raylibKey)
         return '8';
     case KEY_KP_9:
         return '9';
-    case KEY_KP_ENTER:
-        return ExtKeys::RETURN;
-    case KEY_KP_ADD:
-        return '+';
-    case KEY_KP_SUBTRACT:
-        return '-';
-    case KEY_KP_MULTIPLY:
-        return '*';
+    case KEY_KP_DECIMAL:
+        return '.';
     case KEY_KP_DIVIDE:
         return '/';
     default:
@@ -236,79 +221,160 @@ static long MapKey(int raylibKey)
 
 int main(int argc, char* argv[])
 {
-    PrintWelcome();
+    fprintf(stderr, "DEBUG: main start\n");
+    fflush(stderr);
 
-    // Create Raylib display
-    ZepDisplay_Raylib display(SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    // Create the Zep editor
-    ZepEditor editor(&display, ".");
-
-    // Register Vim mode
-    editor.RegisterMode(std::make_shared<ZepMode_Vim>(editor));
-
-    // Default to Vim mode
-    editor.SetCurrentMode("Vim");
-
-    // Load file if provided
-    std::string filename = (argc > 1) ? argv[1] : "";
-    if (!filename.empty())
+    try
     {
-        editor.GetFileBuffer(filename);
-    }
-    else
-    {
-        editor.GetEmptyBuffer("untitled");
-    }
+        fprintf(stderr, "DEBUG: after try\n");
+        fflush(stderr);
 
-    std::cout << "Editor initialized. Window should appear." << std::endl;
-    std::cout << "Press ESC then q to quit, or :q in the editor." << std::endl;
+        PrintWelcome();
+        fprintf(stderr, "DEBUG: after PrintWelcome\n");
+        fflush(stderr);
 
-    // Main loop
-    while (!display.ShouldClose())
-    {
-        display.BeginFrame();
+        // Create Raylib display
+        fprintf(stderr, "DEBUG: creating display\n");
+        fflush(stderr);
+        Zep::ZepDisplay_Raylib display(SCREEN_WIDTH, SCREEN_HEIGHT);
+        fprintf(stderr, "DEBUG: after display\n");
+        fflush(stderr);
 
-        // Handle input
-        // Check for character input (text)
-        int codepoint = display.GetCharPressed();
-        while (codepoint != 0)
+        // Create the Zep editor
+        fprintf(stderr, "DEBUG: creating editor\n");
+        fflush(stderr);
+        Zep::ZepEditor editor(&display, ".");
+        fprintf(stderr, "DEBUG: after editor\n");
+        fflush(stderr);
+
+        // Register Vim mode
+        printf("Registering Vim mode...\n");
+        fflush(stdout);
+        editor.RegisterGlobalMode(std::make_shared<Zep::ZepMode_Vim>(editor));
+        printf("Registered Vim mode\n");
+        fflush(stdout);
+
+        // Register Standard mode as well
+        editor.RegisterGlobalMode(std::make_shared<Zep::ZepMode_Standard>(editor));
+
+        // Initialize buffer FIRST, before setting global mode
+        printf("About to InitWithText...\n");
+        fflush(stdout);
+        auto pBuf = editor.InitWithText("untitled", "");
+        printf("After InitWithText, buffer: %p\n", pBuf);
+        fflush(stdout);
+
+        printf("  Buffers: %zu\n", editor.GetBuffers().size());
+        fflush(stdout);
+
+        printf("About to UpdateWindowState...\n");
+        fflush(stdout);
+        editor.UpdateWindowState();
+        printf("After UpdateWindowState\n");
+        fflush(stdout);
+
+        // Set the display region to match the window size
+        printf("About to SetDisplayRegion...\n");
+        fflush(stdout);
+        editor.SetDisplayRegion(Zep::NVec2f(0.0f, 0.0f), Zep::NVec2f(SCREEN_WIDTH, SCREEN_HEIGHT));
+        printf("After SetDisplayRegion\n");
+        fflush(stdout);
+
+        // THEN set global mode - now there's a window
+        printf("About to SetGlobalMode(Vim)...\n");
+        fflush(stdout);
+        editor.SetGlobalMode("Vim");
+        printf("After SetGlobalMode(Vim)\n");
+        fflush(stdout);
+
+        // Debug: check current mode
+        auto* pMode = editor.GetGlobalMode();
+        printf("Global mode pointer: %p\n", pMode);
+        if (pMode)
         {
-            if (codepoint >= 32 && codepoint <= 126)
-            {
-                // ASCII printable
-                editor.AddKeyPress(codepoint, 0);
-            }
-            else if (codepoint > 127)
-            {
-                // UTF-8 - pass as-is for now
-                editor.AddKeyPress(codepoint, 0);
-            }
-            codepoint = display.GetCharPressed();
+            printf("Global mode name: %s\n", pMode->Name());
+        }
+        fflush(stdout);
+
+        // Begin the mode on the active window
+        printf("About to GetActiveWindow...\n");
+        fflush(stdout);
+        Zep::ZepWindow* pWin = editor.GetActiveWindow();
+        printf("Got window: %p\n", pWin);
+        fflush(stdout);
+
+        if (pWin)
+        {
+            printf("About to Begin...\n");
+            fflush(stdout);
+            editor.GetGlobalMode()->Begin(pWin);
+            printf("After Begin\n");
+            fflush(stdout);
+        }
+        else
+        {
+            printf("ERROR: Still no window!\n");
+            fflush(stdout);
         }
 
-        // Check for special key input
-        int key = display.GetKeyPressed();
-        while (key != 0)
+        printf("Main loop starting...\n");
+        fflush(stdout);
+        std::cout << "Editor initialized. Window should appear." << std::endl;
+        std::cout << "Press ESC then q to quit, or :q in the editor." << std::endl;
+        std::cout << "If window doesn't appear, there may be a display rendering issue." << std::endl;
+        std::cout.flush();
+
+        // Main loop - run until window is closed
+        int frameCount = 0;
+        while (!display.ShouldClose())
         {
-            long zepKey = MapKey(key);
-            if (zepKey != 0)
+            display.BeginFrame();
+
+            // Handle input via ZepEditor API
+            auto pBuffer = editor.GetActiveBuffer();
+            if (pBuffer)
             {
-                editor.AddKeyPress(zepKey, 0);
+                auto pMode = pBuffer->GetMode();
+
+                // Check for character input (text)
+                int codepoint = display.GetCharPressed();
+                while (codepoint != 0)
+                {
+                    pMode->AddKeyPress(codepoint, 0);
+                    codepoint = display.GetCharPressed();
+                }
+
+                // Check for special key input
+                int key = display.GetKeyPressed();
+                while (key != 0)
+                {
+                    long zepKey = MapKey(key);
+                    // MapKey returns 0 for RETURN (ExtKeys::RETURN = 0), so we need to handle that
+                    if (zepKey != 0 || key == KEY_ENTER)
+                    {
+                        pMode->AddKeyPress(zepKey, 0);
+                    }
+                    key = display.GetKeyPressed();
+                }
             }
-            key = display.GetKeyPressed();
+
+            // Render the editor
+            editor.Display();
+
+            display.EndFrame();
+            frameCount++;
         }
 
-        // Render the editor
-        auto pWindow = editor.GetActiveWindow();
-        if (pWindow)
-        {
-            pWindow->Display();
-        }
-
-        display.EndFrame();
+        std::cout << "Rendered " << frameCount << " frames, exiting." << std::endl;
+        std::cout << "Goodbye!" << std::endl;
     }
-
-    std::cout << "Goodbye!" << std::endl;
+    catch (const std::exception& e)
+    {
+        printf("EXCEPTION: %s\n", e.what());
+    }
+    catch (...)
+    {
+        printf("UNKNOWN EXCEPTION\n");
+    }
     return 0;
 }

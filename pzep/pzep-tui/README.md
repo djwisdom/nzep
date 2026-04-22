@@ -1,43 +1,98 @@
-# pzep-tui
-## A Terminal-Based Vim-Like Editor
+# pzep-tui: Terminal-Based Vim-Like Editor using FTXUI
 
-> **Status: Coming Soon**
-> 
-> The TUI version is not yet implemented. For now, use pzep-gui (Raylib) for a graphical experience, or the main nZep editor.
+## Build Instructions
 
----
+### Prerequisites
 
-## Planned Features
+- C++20 compiler
+- CMake 3.15+
+- FTXUI library
 
-- Full Vim emulation (motion, operators, ex commands)
-- Terminal renderer using ANSI escape codes
-- Multiple file editing with tabs/splits
-- Syntax highlighting
-- Git integration
-- Macros and folds
-- True terminal/TTY experience (not graphical window)
+### Install Dependencies
 
----
-
-## For Now: Use pzep-gui
-
-If you want to try pZep today, use the GUI version:
-
-```bash
-# Build pzep-gui
-cd pzep-gui
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build .
-
-# Run
-./pzep-gui file.txt
+**Windows (vcpkg):**
+```powershell
+vcpkg install ftxui:x64-windows
 ```
 
-See [pzep-gui README](../pzep-gui) for full build instructions.
+**Linux:**
+```bash
+# Debian/Ubuntu
+sudo apt install libftxui-dev
 
----
+# Fedora/RHEL
+sudo dnf install ftxui
 
-## Documentation
+# Arch
+sudo pacman -S ftxui
+```
 
-See [User Guide](../docs/USER_GUIDE.md) for Vim keybinding reference.
+**macOS:**
+```bash
+brew install ftxui
+```
+
+**FreeBSD:**
+```bash
+sudo pkg install ftxui
+```
+
+### Building
+
+```bash
+# Create build directory
+mkdir build && cd build
+
+# Configure
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build
+cmake --build .
+```
+
+### Running
+
+```bash
+./pzep-tui [filename]
+```
+
+## Keybindings
+
+| Key | Action |
+|-----|--------|
+| `h/j/k/l` | Navigation |
+| `i` | Insert mode |
+| `ESC` | Normal mode |
+| `:` | Ex command mode |
+| `w/b` | Word motion |
+| `0/$` | Line motion |
+| `gg/G` | File motion |
+
+## Ex Commands
+
+- `:w` - Save file
+- `:q` - Quit
+- `:q!` - Quit without saving
+- `:e <file>` - Open file
+- `:bn` - Next buffer
+- `:bp` - Previous buffer
+- `:sp <file>` - Split horizontally
+- `:set <option>` - Toggle options
+
+## Architecture
+
+pZep-tui uses FTXUI for terminal rendering:
+
+- **Display Backend**: `ZepDisplay_FTXUI` implements `ZepDisplay` interface
+- **Font Handling**: `ZepFont_FTXUI` manages terminal font metrics
+- **Input**: FTXUI event loop handles keyboard/mouse input
+- **Rendering**: Element-based declarative UI (React-style)
+
+## Note on Terminal Support
+
+FTXUI requires a terminal emulator (not raw TTY). It works with:
+- Terminal emulators (iTerm2, Windows Terminal, kitty, etc.)
+- SSH sessions
+- screen/tmux
+
+For true TTY support, consider the NCurses backend (planned future enhancement).

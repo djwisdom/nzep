@@ -144,6 +144,16 @@ public:
     virtual void MoveCursorY(int yDistance, LineLocation clampLocation = LineLocation::LineLastNonCR);
     virtual NVec2i BufferToDisplay();
 
+    // Vertical scrolling control
+    void ScrollToCursorLineTop();
+    void ScrollToCursorLineCenter();
+    void ScrollToCursorLineBottom();
+    float GetVScrollMax() const;
+
+    // Horizontal scrolling control
+    void ScrollHorizontal(float delta);
+    float GetHScrollMax() const;
+
     // Flags
     virtual void SetWindowFlags(uint32_t windowFlags);
     virtual uint32_t GetWindowFlags() const;
@@ -159,6 +169,9 @@ public:
     NVec4f FilterActiveColor(const NVec4f& col, float atten = 1.0f);
 
     void DirtyLayout();
+
+    // Region accessors
+    float GetTextRegionWidth() const;
 
 private:
     void UpdateLayout(bool force = false);
@@ -279,6 +292,7 @@ private:
     // Setup of displayed lines
     std::vector<SpanInfo*> m_windowLines; // Information about the currently displayed lines
     float m_textOffsetPx = 0.0f; // The Scroll position within the text
+    float m_hScrollOffsetPx = 0.0f; // Horizontal scroll offset in pixels
     NVec2f m_textSizePx; // The calculated size of the buffer text, containing just the text
     NVec2i m_visibleLineIndices = { 0, 0 }; // Index of the line spans that are visible
     long m_maxDisplayLines = 0;

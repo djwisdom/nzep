@@ -24,6 +24,11 @@ public:
         return m_font;
     }
 
+    ::Font GetFont() const
+    {
+        return m_font;
+    }
+
 private:
     ::Font m_font;
     int m_baseSize;
