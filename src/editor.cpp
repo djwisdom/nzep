@@ -72,7 +72,6 @@ ZepEditor::ZepEditor(ZepDisplay* pDisplay, const fs::path& configRoot, uint32_t 
     , m_flags(flags)
     , m_configRoot(configRoot)
 {
-
 #if defined(ZEP_FEATURE_CPP_FILE_SYSTEM)
     if (m_pFileSystem == nullptr)
     {
@@ -102,21 +101,12 @@ ZepEditor::ZepEditor(ZepDisplay* pDisplay, const fs::path& configRoot, uint32_t 
     assert(m_pDisplay != nullptr);
     RegisterGlobalMode(std::make_shared<ZepMode_Vim>(*this));
     RegisterGlobalMode(std::make_shared<ZepMode_Standard>(*this));
-    // Don't set global mode here - let the client do it
-    // SetGlobalMode(ZepMode_Vim::StaticName());
-
-    fprintf(stderr, "DEBUG: NOT calling SetGlobalMode in constructor - let client do it\n");
-    fflush(stderr);
 
     timer_restart(m_cursorTimer);
     timer_restart(m_lastEditTimer);
     m_commandLines.push_back("");
 
     RegisterSyntaxProviders(*this);
-
-    // m_spGit = std::make_shared<ZepGit>(*this);  // disabled for testing
-    fprintf(stderr, "DEBUG: ZepGit disabled for testing\n");
-    fflush(stderr);
 
     m_editorRegion = std::make_shared<Region>();
     m_editorRegion->layoutType = RegionLayoutType::VBox;
@@ -443,22 +433,16 @@ ZepWindow* ZepEditor::AddSearch()
 
 ZepTabWindow* ZepEditor::EnsureTab()
 {
-    fprintf(stderr, "DEBUG: EnsureTab called, m_tabWindows.size() = %zu\n", m_tabWindows.size());
     if (m_tabWindows.empty())
     {
-        fprintf(stderr, "DEBUG: calling AddTabWindow from EnsureTab\n");
-        auto result = AddTabWindow();
-        fprintf(stderr, "DEBUG: EnsureTab after AddTabWindow, result = %p\n", result);
-        return result;
+        return AddTabWindow();
     }
 
     if (m_pActiveTabWindow)
     {
         return m_pActiveTabWindow;
     }
-    auto result = m_tabWindows[0];
-    fprintf(stderr, "DEBUG: EnsureTab returning m_tabWindows[0] = %p\n", result);
-    return result;
+    return m_tabWindows[0];
 }
 
 // Nothing here currently; we used to create a default tab, now we don't.  It is up to the client
@@ -510,18 +494,10 @@ ZepBuffer* ZepEditor::InitWithFile(const std::string& str)
 
 ZepBuffer* ZepEditor::InitWithText(const std::string& strName, const std::string& strText)
 {
-    fprintf(stderr, "DEBUG: InitWithText start\n");
     auto pTab = EnsureTab();
-    fprintf(stderr, "DEBUG: InitWithText after EnsureTab, pTab = %p\n", pTab);
-
     auto pBuffer = GetEmptyBuffer(strName);
-    fprintf(stderr, "DEBUG: InitWithText got buffer %p\n", pBuffer);
     pBuffer->SetText(strText);
-    fprintf(stderr, "DEBUG: InitWithText set text\n");
-
     pTab->AddWindow(pBuffer, nullptr, RegionLayoutType::HBox);
-    fprintf(stderr, "DEBUG: InitWithText after AddWindow\n");
-
     return pBuffer;
 }
 
@@ -692,20 +668,12 @@ void ZepEditor::UpdateTabs()
 
 ZepTabWindow* ZepEditor::AddTabWindow()
 {
-    fprintf(stderr, "DEBUG: AddTabWindow called\n");
     auto pTabWindow = new ZepTabWindow(*this);
-    fprintf(stderr, "DEBUG: AddTabWindow created tab window %p\n", pTabWindow);
     m_tabWindows.push_back(pTabWindow);
     m_pActiveTabWindow = pTabWindow;
-    fprintf(stderr, "DEBUG: AddTabWindow set m_pActiveTabWindow\n");
 
-    fprintf(stderr, "DEBUG: AddTabWindow calling GetEmptyBuffer\n");
     auto pEmpty = GetEmptyBuffer("[Default]", FileFlags::DefaultBuffer);
-    fprintf(stderr, "DEBUG: AddTabWindow got buffer %p\n", pEmpty);
-    fprintf(stderr, "DEBUG: AddTabWindow calling AddWindow\n");
     pTabWindow->AddWindow(pEmpty, nullptr, RegionLayoutType::HBox);
-    fprintf(stderr, "DEBUG: AddTabWindow after AddWindow\n");
-    fprintf(stderr, "DEBUG: AddTabWindow returning %p\n", pTabWindow);
 
     return pTabWindow;
 }
